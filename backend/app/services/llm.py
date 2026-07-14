@@ -36,10 +36,22 @@ JSON 必须严格使用以下结构：
 
 要求：
 1. score 是 0 到 100 之间的整数，表示岗位匹配度。
-2. 分析已匹配技能、待补技能、学习建议以及为什么这样判断。
-3. greeting 必须真实、简洁、不夸大候选人的能力。
-4. confidence 是 0 到 1 之间的数字。
-5. 所有数组只包含字符串。
+2. 只能依据 candidate_profile 判断候选人拥有的技能和经历。
+3. 岗位 JD 中出现的技能不能自动视为候选人已经掌握。
+4. candidate_profile 未提及的岗位技能必须归入 missing_skills，或明确标注“未体现，需要确认”。
+5. “了解”“学习中”“基础接触”只能视为基础能力，不能等同于熟练掌握。
+6. 不得虚构工作经历、项目经历、学历或技能。
+7. matched_skills 中的每一项都必须能在 candidate_profile 中找到直接依据。
+8. greeting 只能引用 candidate_profile 中真实存在的信息，不能声称掌握未提及或仅了解的技能。
+9. score 必须同时参考岗位要求、candidate_profile 明确体现的能力，以及缺失或仅处于基础阶段的能力。
+10. 分析已匹配技能、待补技能、学习建议以及为什么这样判断。
+11. greeting 必须真实、简洁、不夸大候选人的能力。
+12. confidence 是 0 到 1 之间的数字。
+13. 所有数组只包含字符串。
+14. 不得提升 candidate_profile 中任何技能的熟练程度，也不得自动美化成更强的能力描述。
+15. 不得将“了解”改写为“掌握”或“熟悉”，不得将“掌握”改写为“熟练掌握”或“精通”。
+16. 不得将“使用过”改写为“熟练使用”；“学习中”“基础阶段”等弱化语义必须原样保留。
+17. greeting 应尽量复用 candidate_profile 的原始措辞，只能使用其中有直接依据的能力描述。
 """
 
 
@@ -148,11 +160,20 @@ def _parse_analysis(content: str) -> JobAnalysis:
         raise LLMResponseFormatError("模型返回格式错误") from exc
 
 
-def analyze_job(job_title: str, job_description: str) -> JobAnalysis:
+def analyze_job(
+    job_title: str,
+    job_description: str,
+    candidate_profile: str,
+) -> JobAnalysis:
     """Ask DeepSeek to analyze a job description and return validated JSON."""
     api_key, base_url, model = _read_config()
     client = OpenAI(api_key=api_key, base_url=base_url, timeout=30.0, max_retries=1)
-    user_prompt = f"岗位标题：{job_title}\n\n岗位描述：\n{job_description}"
+    user_prompt = (
+        f"岗位标题：{job_title}\n\n"
+        f"岗位描述（仅用于识别岗位要求）：\n{job_description}\n\n"
+        "候选人资料（判断候选人技能和经历的唯一依据）：\n"
+        f"{candidate_profile}"
+    )
 
     try:
         response = client.chat.completions.create(
@@ -162,7 +183,7 @@ def analyze_job(job_title: str, job_description: str) -> JobAnalysis:
                 {"role": "user", "content": user_prompt},
             ],
             response_format={"type": "json_object"},
-            temperature=0.2,
+            temperature=0.0,
             max_tokens=2000,
         )
     except APITimeoutError as exc:

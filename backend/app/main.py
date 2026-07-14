@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .services.llm import JobAnalysis, LLMServiceError, analyze_job
 
@@ -37,13 +37,26 @@ class JobAnalysisRequest(BaseModel):
 
     job_title: str = Field(min_length=1, max_length=500)
     job_description: str = Field(min_length=1, max_length=8000)
+    candidate_profile: str = Field(min_length=1, max_length=8000)
+
+    @field_validator("job_title", "job_description", "candidate_profile")
+    @classmethod
+    def reject_blank_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("字段不能为空")
+        return stripped
 
 
 @app.post("/api/analyze-job", response_model=JobAnalysis)
 def analyze_job_endpoint(payload: JobAnalysisRequest) -> JobAnalysis:
     """Analyze a job description through the configured LLM service."""
     try:
-        return analyze_job(payload.job_title, payload.job_description)
+        return analyze_job(
+            payload.job_title,
+            payload.job_description,
+            payload.candidate_profile,
+        )
     except LLMServiceError as exc:
         raise HTTPException(
             status_code=exc.status_code,

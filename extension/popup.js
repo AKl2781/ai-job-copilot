@@ -4,8 +4,35 @@ const analyzeJobButton = document.querySelector("#analyze-job");
 const pageTitle = document.querySelector("#page-title");
 const pageUrl = document.querySelector("#page-url");
 const jobDescription = document.querySelector("#job-description");
+const candidateProfile = document.querySelector("#candidate-profile");
 const analysisResult = document.querySelector("#analysis-result");
 const result = document.querySelector("#result");
+
+const CANDIDATE_PROFILE_STORAGE_KEY = "aiJobCopilot.candidateProfile";
+const DEFAULT_CANDIDATE_PROFILE =
+  "大数据专业学生，掌握 Python、FastAPI、Git，使用过 Linux，完成过 AI Agent 项目。" +
+  "了解 SQL，Docker 处于基础学习阶段，暂无正式开发实习经历。";
+
+function loadCandidateProfile() {
+  try {
+    candidateProfile.value =
+      localStorage.getItem(CANDIDATE_PROFILE_STORAGE_KEY) ?? DEFAULT_CANDIDATE_PROFILE;
+  } catch (error) {
+    console.error("Loading candidate profile failed:", error);
+    candidateProfile.value = DEFAULT_CANDIDATE_PROFILE;
+  }
+}
+
+function saveCandidateProfile() {
+  try {
+    localStorage.setItem(CANDIDATE_PROFILE_STORAGE_KEY, candidateProfile.value);
+  } catch (error) {
+    console.error("Saving candidate profile failed:", error);
+  }
+}
+
+loadCandidateProfile();
+candidateProfile.addEventListener("input", saveCandidateProfile);
 
 function setStatus(message, type = "") {
   result.className = "result";
@@ -90,8 +117,13 @@ readJobButton.addEventListener("click", async () => {
 
 analyzeJobButton.addEventListener("click", async () => {
   const description = jobDescription.value.trim();
+  const candidateProfileText = candidateProfile.value.trim();
   if (!description) {
     setStatus("请先读取当前岗位或手动填写岗位 JD", "error");
+    return;
+  }
+  if (!candidateProfileText) {
+    setStatus("请先填写个人技能或简历简介", "error");
     return;
   }
 
@@ -106,6 +138,7 @@ analyzeJobButton.addEventListener("click", async () => {
       body: JSON.stringify({
         job_title: pageTitle.textContent.trim() || "未命名岗位",
         job_description: description,
+        candidate_profile: candidateProfileText,
       }),
     });
 
