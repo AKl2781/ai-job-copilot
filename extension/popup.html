@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Job Copilot</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="panel">
+      <h1>AI Job Copilot</h1>
+      <p class="intro">浏览器扩展初始化成功</p>
+
+      <section class="job-section" aria-labelledby="job-heading">
+        <div class="section-heading">
+          <h2 id="job-heading">当前岗位</h2>
+          <button id="read-job" type="button">读取当前岗位</button>
+        </div>
+
+        <dl class="page-details">
+          <div>
+            <dt>页面标题</dt>
+            <dd id="page-title">尚未读取</dd>
+          </div>
+          <div>
+            <dt>当前 URL</dt>
+            <dd id="page-url" title="">尚未读取</dd>
+          </div>
+        </dl>
+
+        <label for="job-description">岗位 JD</label>
+        <textarea
+          id="job-description"
+          rows="12"
+          maxlength="8000"
+          placeholder="点击“读取当前岗位”获取网页正文，也可以在此手动输入或修改。"
+        ></textarea>
+      </section>
+
+      <button id="analyze-job" class="analyze" type="button">分析岗位</button>
+
+      <section id="analysis-result" class="analysis" aria-labelledby="analysis-heading" hidden>
+        <h2 id="analysis-heading">AI 分析结果</h2>
+
+        <h3>匹配度</h3>
+        <p id="analysis-score"></p>
+
+        <h3>摘要</h3>
+        <p id="analysis-summary"></p>
+
+        <h3>已匹配技能</h3>
+        <ul id="matched-skills"></ul>
+
+        <h3>待补技能</h3>
+        <ul id="missing-skills"></ul>
+
+        <h3>学习建议</h3>
+        <ul id="learning-plan"></ul>
+
+        <h3>AI 判断原因</h3>
+        <ul id="analysis-reasoning"></ul>
+
+        <h3>打招呼文案</h3>
+        <p id="analysis-greeting"></p>
+
+        <p id="analysis-confidence" class="developer-info"></p>
+      </section>
+
+      <button id="health-check" class="secondary" type="button">检查后端连接</button>
+      <p id="result" class="result" role="status" aria-live="polite"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

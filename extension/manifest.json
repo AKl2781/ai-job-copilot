@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "AI Job Copilot",
+  "description": "面向 Microsoft Edge 并兼容 Google Chrome 的 AI 求职助手原型。",
+  "version": "0.1.0",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AI Job Copilot"
+  }
+}
