@@ -30,6 +30,23 @@
         </div>
       </header>
 
+      <section class="card service-section" aria-labelledby="service-heading">
+        <div class="service-row">
+          <div>
+            <p class="eyebrow">本地服务</p>
+            <h2 id="service-heading">FastAPI 后端</h2>
+            <p id="service-status" class="service-status" aria-live="polite">未检测</p>
+          </div>
+          <button id="service-control" class="button button-secondary" type="button" disabled>
+            <span id="service-spinner" class="spinner spinner-dark" aria-hidden="true" hidden></span>
+            <span id="service-control-label">检测中</span>
+          </button>
+        </div>
+        <p id="native-install-hint" class="service-help">
+          首次使用需要运行 <code>install_native_host.bat &lt;扩展ID&gt;</code> 完成一次本地连接安装。
+        </p>
+      </section>
+
       <section class="card job-section" aria-labelledby="job-heading">
         <div class="section-heading">
           <div>

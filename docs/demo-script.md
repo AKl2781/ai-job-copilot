@@ -7,7 +7,9 @@
 ## 演示前准备
 
 - 在项目根目录准备未提交的 `.env`，确认 `LLM_API_KEY` 可用。
-- 双击 `start_ai_job_copilot.bat` 启动后端，并保持后端窗口打开。也可以手动运行：
+- 首次演示 Native Messaging 时，从 `edge://extensions` 复制真实扩展 ID，运行
+  `install_native_host.bat <扩展ID>`，然后重新加载扩展。不要猜测 ID。
+- 推荐打开扩展并点击“启动本地服务”。也可以双击 `start_ai_job_copilot.bat`，或手动运行：
 
   ```powershell
   uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
@@ -33,6 +35,10 @@
 | 1:45–2:00 | 编辑 greeting 并点击“复制打招呼文案” | “文案可以修改和复制，但项目不会自动发送消息；分数也只作求职辅助参考，不等于录用概率。” |
 
 演示结束后双击 `stop_ai_job_copilot.bat` 停止后端。
+
+若演示扩展内控制，则将开场改为点击“启动本地服务”，等待状态变为“运行中”；结束时点击
+“停止本地服务”。分析按钮还会在服务停止时询问是否启动，确认后只续接一次原分析请求。
+默认自动化验收不执行最后的真实 DeepSeek 分析请求。
 
 ## 4–5 分钟扩展讲解版
 

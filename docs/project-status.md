@@ -4,6 +4,14 @@
 
 AI Job Copilot 已完成本地 MVP 的核心闭环：Edge 优先、Chrome 兼容的 Manifest V3 扩展读取岗位内容和候选人资料，本地 FastAPI 调用 DeepSeek 提取岗位要求与候选人证据，再由后端按固定权重计算结构化匹配结果，API Key 只保留在后端。仓库提供 Windows 一键启动/停止入口，并包含 pytest 和 Node 测试。项目没有数据库或云端部署，未进行大规模用户验证；评分仅供参考，不等于录用概率。当前也没有自动投递或自动聊天，不具备生产系统所需的账号、鉴权、云端存储和运维能力。
 
+## Experimental / local integration
+
+`feat/native-service-control` 增加了 Windows + Microsoft Edge 的实验性 Native Messaging 集成。
+用户为真实扩展 ID 完成一次当前用户注册后，可以在 popup 内按需启动和安全停止本地 FastAPI。
+Host 每次只处理一条 `status`、`start` 或 `stop` 白名单消息，且复用现有启停脚本的进程归属判断。
+这项能力需要开发者加载解压缩扩展并手动运行一次安装脚本，不代表已经达到普通用户一键安装的产品水平，
+也不属于 `v1.0-mvp`。
+
 ## 功能状态矩阵
 
 | 能力 | 状态 | 代码或验证依据 |
@@ -19,6 +27,7 @@ AI Job Copilot 已完成本地 MVP 的核心闭环：Edge 优先、Chrome 兼容
 | `candidate_profile` 输入 | 已实现 | popup 表单与三字段请求 |
 | 候选人资料 localStorage 保存 | 已实现 | `aiJobCopilot.candidateProfile` |
 | Windows 一键启动与停止 | 已实现 | `start_ai_job_copilot.bat`、`stop_ai_job_copilot.bat`、`scripts/*.ps1` |
+| Edge 扩展内按需启停 | 实验性本地集成 | Native Messaging、`native_host/`、安装/卸载脚本 |
 | FastAPI 根接口、健康检查和分析接口 | 已实现 | `backend/app/main.py` |
 | DeepSeek 要求与证据提取 | 已实现 | `backend/app/services/llm.py` |
 | 后端确定性评分 | 已实现 | `backend/app/services/scoring.py` 的固定状态映射与维度权重 |
@@ -28,7 +37,7 @@ AI Job Copilot 已完成本地 MVP 的核心闭环：Edge 优先、Chrome 兼容
 | 新版结果 UI | 已实现 | score 卡片、技能标签、评分依据折叠区、loading/错误状态、自动滚动 |
 | greeting 编辑与复制 | 已实现 | textarea、复制按钮与成功/失败反馈 |
 | 上游与格式异常处理 | 已实现 | `LLMServiceError` 体系和 API 转换 |
-| pytest 与 Node 测试 | 已实现 | 合并回归 pytest 29 项、content 与 popup Node 测试通过 |
+| pytest 与 Node 测试 | 已实现 | 功能分支回归 pytest 43 项、content 与 popup Node 测试通过 |
 | 合并后真实 DeepSeek 联调 | 未运行 | 依赖个人 Key，按本次合并要求不调用真实 API |
 | 线上部署 / 生产可用 | 未实现 | 当前为本地 MVP |
 | 自动投递 / 自动聊天 / 自动刷新岗位 | 未实现 | 不在当前功能范围 |
@@ -48,6 +57,7 @@ AI Job Copilot 已完成本地 MVP 的核心闭环：Edge 优先、Chrome 兼容
 
 - 具体招聘网站在当前页面版本下的提取效果。
 - Edge 与 Chrome 实际加载、权限提示和快捷键冲突情况。
+- Edge Native Messaging 使用真实解压缩扩展 ID 的完整人工集成验收。
 - 真实网络环境中的 DeepSeek 延迟、限流和输出质量。
 - 候选人对匹配结果、建议和打招呼文案的人工核验。
 
