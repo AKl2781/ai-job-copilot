@@ -68,6 +68,9 @@ function createHarness() {
   const storage = new Map();
   const timers = [];
   const fetchQueue = [];
+  const fetchCalls = [];
+  const nativeQueue = [];
+  const nativeCalls = [];
   let scriptRuns = 0;
   let copiedText = "";
 
@@ -115,8 +118,20 @@ function createHarness() {
           }];
         },
       },
+      runtime: {
+        lastError: null,
+        sendMessage: (message, callback) => {
+          nativeCalls.push(message);
+          callback(nativeQueue.shift() || {
+            ok: true,
+            state: "stopped",
+            message: "本地服务已停止",
+          });
+        },
+      },
     },
-    fetch: async () => {
+    fetch: async (...args) => {
+      fetchCalls.push(args);
       if (!fetchQueue.length) throw new TypeError("connection refused with traceback details");
       return fetchQueue.shift();
     },
@@ -143,6 +158,9 @@ function createHarness() {
     storage,
     timers,
     fetchQueue,
+    fetchCalls,
+    nativeQueue,
+    nativeCalls,
     getScriptRuns: () => scriptRuns,
     getCopiedText: () => copiedText,
   };
@@ -165,15 +183,21 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
     "analysis-summary",
     "analysis-greeting",
     "copy-greeting",
+    "service-status",
+    "service-control",
+    "service-control-label",
+    "service-spinner",
   ]) {
     assert.ok(popupHtml.includes(`id="${id}"`), `missing #${id}`);
   }
 
   const harness = createHarness();
-  const { context, elements, storage, timers, fetchQueue } = harness;
+  const { context, elements, storage, timers, fetchQueue, nativeQueue } = harness;
   await nextTurn();
   assert.strictEqual(harness.getScriptRuns(), 1, "popup should automatically read the active job");
   assert.strictEqual(elements["read-source"].textContent, "智能岗位详情识别");
+  assert.strictEqual(elements["service-status"].textContent, "本地服务已停止");
+  assert.strictEqual(elements["service-control-label"].textContent, "启动本地服务");
 
   elements["candidate-profile"].value = "真实候选人资料";
   await elements["candidate-profile"].trigger("input");
@@ -247,16 +271,53 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
 
   elements["job-description"].value = "A complete job description";
   elements["candidate-profile"].value = "A truthful candidate profile";
+  fetchQueue.push({ ok: true, json: async () => ({ status: "ok" }) });
   fetchQueue.push({ ok: true, json: async () => fullResponse });
   await elements["analyze-job"].trigger("click");
   assert.strictEqual(elements["analysis-result"].scrollCalls.length, 1);
   assert.strictEqual(elements["analyze-job"].disabled, false);
 
+  fetchQueue.push({ ok: true, json: async () => ({ status: "ok" }) });
   await elements["analyze-job"].trigger("click");
   assert.strictEqual(elements.result.textContent.includes("traceback"), false);
   assert.strictEqual(elements.result.textContent, "后端未连接，请先启动本地服务");
 
-  assert.deepStrictEqual(manifest.permissions, ["activeTab", "scripting"]);
+  vm.runInContext('setServiceState("stopped")', context);
+  nativeQueue.push({ ok: true, state: "running", message: "正在启动" });
+  fetchQueue.push({ ok: true, json: async () => ({ status: "ok" }) });
+  await elements["service-control"].trigger("click");
+  assert.strictEqual(elements["service-status"].textContent, "运行中");
+  assert.strictEqual(elements["service-control"].disabled, false);
+
+  nativeQueue.push({ ok: true, state: "stopped", message: "已停止" });
+  fetchQueue.push({ ok: false, json: async () => ({}) });
+  await elements["service-control"].trigger("click");
+  assert.strictEqual(elements["service-status"].textContent, "已停止");
+
+  const analysisCallsBefore = harness.fetchCalls.filter(
+    ([url, options]) => url.includes("/api/analyze-job") && options?.method === "POST",
+  ).length;
+  context.window.confirm = () => true;
+  nativeQueue.push({ ok: true, state: "running", message: "已启动" });
+  fetchQueue.push({ ok: false, json: async () => ({}) });
+  fetchQueue.push({ ok: true, json: async () => ({ status: "ok" }) });
+  fetchQueue.push({ ok: true, json: async () => fullResponse });
+  await elements["analyze-job"].trigger("click");
+  const analysisCallsAfter = harness.fetchCalls.filter(
+    ([url, options]) => url.includes("/api/analyze-job") && options?.method === "POST",
+  ).length;
+  assert.strictEqual(analysisCallsAfter, analysisCallsBefore + 1, "analysis should resume exactly once");
+
+  vm.runInContext('setServiceState("stopped")', context);
+  context.window.confirm = () => false;
+  fetchQueue.push({ ok: false, json: async () => ({}) });
+  const callsBeforeCancel = harness.fetchCalls.length;
+  await elements["analyze-job"].trigger("click");
+  assert.strictEqual(elements.result.textContent, "已取消启动，未发送分析请求");
+  assert.strictEqual(harness.fetchCalls.length, callsBeforeCancel + 1, "cancel only performs health check");
+
+  assert.ok(manifest.permissions.includes("nativeMessaging"));
+  assert.strictEqual(manifest.background.service_worker, "background.js");
   assert.ok(!manifest.host_permissions.includes("<all_urls>"));
   console.log("popup UI behavior: valid");
 })().catch((error) => {

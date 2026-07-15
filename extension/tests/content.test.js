@@ -162,7 +162,7 @@ assert.ok(!scenarioSix.text.split("\n").includes("收藏"));
 const limited = extract({ selection: "x".repeat(9000) });
 assert.strictEqual(limited.text.length, 8000);
 
-assert.deepStrictEqual(manifest.permissions, ["activeTab", "scripting"]);
+assert.deepStrictEqual(manifest.permissions, ["activeTab", "scripting", "nativeMessaging"]);
 assert.ok(!manifest.host_permissions.includes("<all_urls>"));
 assert.ok(popupCode.includes("readCurrentJob({ automatic: true })"));
 assert.ok(popupCode.includes("candidate_profile: candidateProfileText"));

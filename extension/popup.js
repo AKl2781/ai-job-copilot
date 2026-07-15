@@ -14,9 +14,19 @@ const greetingSection = document.querySelector("#greeting-section");
 const greetingTextarea = document.querySelector("#analysis-greeting");
 const copyGreetingButton = document.querySelector("#copy-greeting");
 const result = document.querySelector("#result");
+const serviceStatus = document.querySelector("#service-status");
+const serviceControlButton = document.querySelector("#service-control");
+const serviceControlLabel = document.querySelector("#service-control-label");
+const serviceSpinner = document.querySelector("#service-spinner");
 let jobDescriptionEdited = false;
 let analysisInProgress = false;
 let copyFeedbackTimer;
+let localServiceState = "unknown";
+let nativeHostInstalled = null;
+
+const HEALTH_URL = "http://127.0.0.1:8000/health";
+const NATIVE_INSTALL_MESSAGE =
+  "首次使用需要安装本地连接组件，请运行项目目录中的 install_native_host.bat。";
 
 const CANDIDATE_PROFILE_STORAGE_KEY = "aiJobCopilot.candidateProfile";
 const DEFAULT_CANDIDATE_PROFILE =
@@ -71,6 +81,145 @@ function setBackendStatus(label, type = "idle") {
   if (labelElement) {
     labelElement.textContent = label;
   }
+}
+
+function setServiceState(state, message = "") {
+  const labels = {
+    unknown: "未检测",
+    uninstalled: "尚未安装本地连接组件",
+    stopped: "已停止",
+    starting: "正在启动",
+    running: "运行中",
+    stopping: "正在停止",
+    error: "启动失败",
+  };
+  localServiceState = state;
+  serviceStatus.textContent = message || labels[state] || labels.error;
+  serviceStatus.className = "service-status";
+  if (state === "running") serviceStatus.classList.add("status-success");
+  if (["stopped", "starting", "stopping"].includes(state)) {
+    serviceStatus.classList.add("status-warning");
+  }
+  if (["uninstalled", "error"].includes(state)) serviceStatus.classList.add("status-error");
+
+  const busy = state === "starting" || state === "stopping";
+  serviceSpinner.hidden = !busy;
+  serviceControlButton.disabled = busy || state === "unknown" || state === "uninstalled";
+  serviceControlLabel.textContent = state === "running" ? "停止本地服务" : "启动本地服务";
+}
+
+async function checkBackendHealth() {
+  try {
+    const response = await fetch(HEALTH_URL);
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data.status === "ok";
+  } catch (_error) {
+    return false;
+  }
+}
+
+function sendNativeControl(action) {
+  return new Promise((resolve) => {
+    if (!chrome.runtime?.sendMessage) {
+      resolve({ ok: false, state: "error", code: "native_host_unavailable" });
+      return;
+    }
+    chrome.runtime.sendMessage({ type: "native-service-control", action }, (response) => {
+      if (chrome.runtime.lastError || !response) {
+        resolve({ ok: false, state: "error", code: "native_host_unavailable" });
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
+async function detectServiceStatus() {
+  if (await checkBackendHealth()) {
+    nativeHostInstalled = true;
+    setServiceState("running");
+    setBackendStatus("后端正常", "success");
+    return "running";
+  }
+
+  setBackendStatus("后端未运行", "error");
+  const response = await sendNativeControl("status");
+  if (response.code === "native_host_unavailable") {
+    nativeHostInstalled = false;
+    setServiceState("uninstalled");
+    return "uninstalled";
+  }
+  nativeHostInstalled = true;
+  const state = response.ok && ["stopped", "running"].includes(response.state)
+    ? response.state
+    : "error";
+  setServiceState(state, response.message || "");
+  return state;
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function pollHealth(expectedRunning, attempts, interval) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const running = await checkBackendHealth();
+    if (running === expectedRunning) return true;
+    if (attempt + 1 < attempts) await wait(interval);
+  }
+  return false;
+}
+
+async function startLocalService() {
+  setServiceState("starting");
+  const response = await sendNativeControl("start");
+  if (response.code === "native_host_unavailable") {
+    nativeHostInstalled = false;
+    setServiceState("uninstalled");
+    showStatus(NATIVE_INSTALL_MESSAGE, "error");
+    return false;
+  }
+  nativeHostInstalled = true;
+  if (!response.ok) {
+    setServiceState("error", response.message || "本地服务启动失败");
+    showStatus(response.message || "本地服务启动失败，请检查后端日志", "error");
+    return false;
+  }
+  if (await pollHealth(true, 30, 400)) {
+    setServiceState("running");
+    setBackendStatus("后端正常", "success");
+    return true;
+  }
+  setServiceState("error", "启动失败或健康检查超时");
+  showStatus("本地服务未能在 12 秒内通过健康检查", "error");
+  return false;
+}
+
+async function stopLocalService() {
+  setServiceState("stopping");
+  const response = await sendNativeControl("stop");
+  if (response.code === "native_host_unavailable") {
+    nativeHostInstalled = false;
+    setServiceState("uninstalled");
+    showStatus(NATIVE_INSTALL_MESSAGE, "error");
+    return false;
+  }
+  nativeHostInstalled = true;
+  if (!response.ok) {
+    setServiceState("error", response.message || "本地服务停止失败");
+    showStatus(response.message || "本地服务停止失败，请手动检查", "error");
+    return false;
+  }
+  if (await pollHealth(false, 25, 400)) {
+    setServiceState("stopped");
+    setBackendStatus("后端未运行", "error");
+    showStatus("本地服务已停止", "success");
+    return true;
+  }
+  setServiceState("error", "停止确认超时");
+  showStatus("本地服务未能在 10 秒内停止，请手动检查", "error");
+  return false;
 }
 
 function setLoadingState(isLoading) {
@@ -301,6 +450,17 @@ greetingTextarea.addEventListener("input", () => {
 copyGreetingButton.addEventListener("click", copyGreeting);
 readJobButton.addEventListener("click", () => readCurrentJob());
 readCurrentJob({ automatic: true });
+detectServiceStatus();
+
+serviceControlButton.addEventListener("click", async () => {
+  serviceControlButton.disabled = true;
+  if (localServiceState === "running") {
+    await stopLocalService();
+  } else {
+    showStatus("正在启动本地服务……", "loading");
+    if (await startLocalService()) showStatus("本地服务已启动", "success");
+  }
+});
 
 analyzeJobButton.addEventListener("click", async () => {
   if (analysisInProgress) return;
@@ -319,9 +479,26 @@ analyzeJobButton.addEventListener("click", async () => {
   setLoadingState(true);
   analysisResult.hidden = true;
   greetingSection.hidden = true;
-  showStatus("正在分析岗位……", "loading");
 
   try {
+    if (!(await checkBackendHealth())) {
+      if (nativeHostInstalled === null) await detectServiceStatus();
+      if (localServiceState === "uninstalled") {
+        showStatus(NATIVE_INSTALL_MESSAGE, "error");
+        return;
+      }
+      const shouldStart = window.confirm(
+        "本地服务尚未启动，是否现在启动并继续分析？",
+      );
+      if (!shouldStart) {
+        showStatus("已取消启动，未发送分析请求", "info");
+        return;
+      }
+      showStatus("正在启动本地服务，成功后将继续分析……", "loading");
+      if (!(await startLocalService())) return;
+    }
+
+    showStatus("正在分析岗位……", "loading");
     const response = await fetch("http://127.0.0.1:8000/api/analyze-job", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -359,17 +536,18 @@ healthCheckButton.addEventListener("click", async () => {
   showStatus("正在检查后端连接……", "loading");
 
   try {
-    const response = await fetch("http://localhost:8000/health");
-    if (!response.ok) throw new Error(`Unexpected HTTP status: ${response.status}`);
-    const data = await response.json();
-    if (data.status !== "ok") throw new Error("Unexpected health response");
-
-    setBackendStatus("后端正常", "success");
-    showStatus("后端连接正常", "success");
+    const state = await detectServiceStatus();
+    if (state === "running") {
+      showStatus("后端连接正常", "success");
+    } else if (state === "uninstalled") {
+      showStatus(NATIVE_INSTALL_MESSAGE, "error");
+    } else {
+      showStatus("后端未运行，可点击“启动本地服务”", "warning");
+    }
   } catch (error) {
     console.error("Backend health check failed:", error);
-    setBackendStatus("后端异常", "error");
-    showStatus("后端未连接，请先启动本地服务", "error");
+    setServiceState("error");
+    showStatus("本地服务状态检查失败", "error");
   } finally {
     healthCheckButton.disabled = false;
   }

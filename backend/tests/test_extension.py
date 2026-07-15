@@ -1,7 +1,12 @@
 """Static checks for browser extension workflows."""
 
 import json
+import importlib.util
+import io
+import struct
 from pathlib import Path
+
+import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 POPUP_HTML = (PROJECT_ROOT / "extension" / "popup.html").read_text(encoding="utf-8")
@@ -9,6 +14,16 @@ POPUP_JS = (PROJECT_ROOT / "extension" / "popup.js").read_text(encoding="utf-8")
 MANIFEST = json.loads(
     (PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8")
 )
+BACKGROUND_JS = (PROJECT_ROOT / "extension" / "background.js").read_text(encoding="utf-8")
+HOST_PATH = PROJECT_ROOT / "native_host" / "host.py"
+HOST_SOURCE = HOST_PATH.read_text(encoding="utf-8")
+INSTALL_SOURCE = (PROJECT_ROOT / "scripts" / "install_native_host.ps1").read_text(encoding="utf-8")
+UNINSTALL_SOURCE = (PROJECT_ROOT / "scripts" / "uninstall_native_host.ps1").read_text(encoding="utf-8")
+
+HOST_SPEC = importlib.util.spec_from_file_location("ai_job_copilot_native_host", HOST_PATH)
+assert HOST_SPEC and HOST_SPEC.loader
+HOST = importlib.util.module_from_spec(HOST_SPEC)
+HOST_SPEC.loader.exec_module(HOST)
 
 
 def test_candidate_profile_input_and_request_payload_exist() -> None:
@@ -78,3 +93,125 @@ def test_manifest_has_action_shortcut_without_broad_access() -> None:
     assert command["suggested_key"]["default"] == "Alt+J"
     assert command["suggested_key"]["windows"] == "Alt+J"
     assert "<all_urls>" not in MANIFEST.get("host_permissions", [])
+
+
+def _native_message(value: object) -> bytes:
+    payload = json.dumps(value).encode("utf-8")
+    return struct.pack("<I", len(payload)) + payload
+
+
+def test_native_host_reads_valid_message() -> None:
+    assert HOST.read_message(io.BytesIO(_native_message({"action": "status"}))) == {
+        "action": "status"
+    }
+
+
+def test_native_host_writes_little_endian_length_prefixed_json() -> None:
+    stream = io.BytesIO()
+    response = {"ok": True, "state": "running", "message": "本地服务正在运行"}
+    HOST.write_message(stream, response)
+    encoded = stream.getvalue()
+    length = struct.unpack("<I", encoded[:4])[0]
+    assert length == len(encoded[4:])
+    assert json.loads(encoded[4:].decode("utf-8")) == response
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"\x01\x00",
+        struct.pack("<I", 0),
+        struct.pack("<I", HOST.MAX_MESSAGE_BYTES + 1),
+        struct.pack("<I", 5) + b"{}",
+    ],
+)
+def test_native_host_rejects_invalid_lengths(payload: bytes) -> None:
+    with pytest.raises(HOST.NativeMessageError):
+        HOST.read_message(io.BytesIO(payload))
+
+
+def test_native_host_rejects_invalid_json_safely() -> None:
+    payload = b"{bad}"
+    with pytest.raises(HOST.NativeMessageError, match="JSON"):
+        HOST.read_message(io.BytesIO(struct.pack("<I", len(payload)) + payload))
+
+
+def test_native_host_rejects_unknown_action_and_ignores_injected_fields() -> None:
+    assert HOST.handle_message({"action": "launch", "command": "whoami"}) == {
+        "ok": False,
+        "state": "error",
+        "message": "不支持的本地服务操作",
+    }
+    called = []
+    original = HOST.ACTIONS["status"]
+    try:
+        HOST.ACTIONS["status"] = lambda: called.append("status") or {
+            "ok": True,
+            "state": "stopped",
+            "message": "ok",
+        }
+        HOST.handle_message({"action": "status", "command": "whoami", "path": "C:\\temp"})
+    finally:
+        HOST.ACTIONS["status"] = original
+    assert called == ["status"]
+
+
+def test_native_host_action_map_is_fixed_and_subprocess_is_not_shell() -> None:
+    assert set(HOST.ACTIONS) == {"status", "start", "stop"}
+    assert HOST.ACTIONS["status"] is HOST.status_action
+    assert HOST.ACTIONS["start"] is HOST.start_action
+    assert HOST.ACTIONS["stop"] is HOST.stop_action
+    assert "shell=False" in HOST_SOURCE
+    assert "START_SCRIPT" in HOST_SOURCE and "STOP_SCRIPT" in HOST_SOURCE
+    assert "shell=True" not in HOST_SOURCE
+
+
+def test_native_host_does_not_access_secrets_or_modify_env_file() -> None:
+    assert "API_KEY" not in HOST_SOURCE
+    assert "os.environ" not in HOST_SOURCE
+    assert 'PROJECT_ROOT / ".env"' not in HOST_SOURCE
+    assert "traceback.print" not in HOST_SOURCE.lower()
+    assert "print(" not in HOST_SOURCE
+
+
+def test_manifest_and_service_worker_use_native_messaging_without_broad_access() -> None:
+    assert "nativeMessaging" in MANIFEST["permissions"]
+    assert MANIFEST["background"]["service_worker"] == "background.js"
+    assert "<all_urls>" not in json.dumps(MANIFEST)
+    assert "sendNativeMessage" in BACKGROUND_JS
+    for action in ("status", "start", "stop"):
+        assert f'"{action}"' in BACKGROUND_JS
+    assert "content.js" not in MANIFEST.get("background", {}).values()
+
+
+def test_popup_contains_service_control_and_safe_analysis_resume() -> None:
+    for text in (
+        "本地服务",
+        "启动本地服务",
+        "首次使用需要运行",
+        "尚未安装本地连接组件",
+        "正在启动",
+        "运行中",
+        "正在停止",
+    ):
+        assert text in POPUP_HTML or text in POPUP_JS
+    assert "本地服务尚未启动，是否现在启动并继续分析？" in POPUP_JS
+    assert "if (!(await startLocalService())) return" in POPUP_JS
+    assert "已取消启动，未发送分析请求" in POPUP_JS
+
+
+def test_installer_is_edge_hkcu_only_and_exact_origin() -> None:
+    assert "HKCU:\\Software\\Microsoft\\Edge\\NativeMessagingHosts" in INSTALL_SOURCE
+    assert "chrome-extension://$ExtensionId/" in INSTALL_SOURCE
+    assert "^[a-p]{32}$" in INSTALL_SOURCE
+    assert "HKLM" not in INSTALL_SOURCE
+    assert "Google\\Chrome" not in INSTALL_SOURCE
+    assert '"*"' not in INSTALL_SOURCE
+    assert "resolvedExistingPath -ne $resolvedManifestPath" in INSTALL_SOURCE
+
+
+def test_uninstaller_only_removes_current_project_registration() -> None:
+    assert "resolvedRegisteredPath -ne $resolvedManifestPath" in UNINSTALL_SOURCE
+    assert "Remove-Item -LiteralPath $RegistryPath" in UNINSTALL_SOURCE
+    assert "Remove-Item -LiteralPath $ManifestPath" in UNINSTALL_SOURCE
+    assert "HKLM" not in UNINSTALL_SOURCE

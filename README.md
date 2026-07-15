@@ -46,17 +46,49 @@ backend/
   tests/                  pytest 测试
 extension/
   manifest.json           Manifest V3 配置与 Alt+J 快捷键
+  background.js           Native Messaging 白名单转发
   content.js              页面岗位内容提取
   popup.html/css/js       交互、资料保存、请求与结果渲染
   tests/content.test.js   Node 提取逻辑测试
   tests/popup.test.js     Node popup 交互测试
 scripts/                  Windows 后端启动与停止脚本
+native_host/              短生命周期 Native Host 与 manifest 模板
+install_native_host.bat   当前用户 Edge Host 注册入口
+uninstall_native_host.bat 当前项目 Host 安全卸载入口
 start_ai_job_copilot.bat  Windows 一键启动入口
 stop_ai_job_copilot.bat   Windows 一键停止入口
 docs/                     架构、演示、面试与项目包装材料
 ```
 
 ## 本地运行
+
+### 推荐：扩展内按需启动
+
+当前实验性方案支持 Windows + Microsoft Edge。首次使用只需完成一次本地连接安装：
+
+1. 在 `edge://extensions` 开启开发人员模式。
+2. 选择“加载解压缩的扩展”，加载项目的 `extension` 文件夹。
+3. 复制页面显示的真实扩展 ID；不要猜测 ID。
+4. 在项目根目录运行：
+
+   ```powershell
+   install_native_host.bat <扩展ID>
+   ```
+
+5. 回到 `edge://extensions` 重新加载扩展。
+
+之后打开扩展，点击“启动本地服务”；使用结束后点击“停止本地服务”。首次注册只需做一次，
+无需每次运行 BAT，不需要 Docker，也不要求后端开机常驻。Native Messaging Host 是短生命周期
+组件，只允许 `status`、`start` 和 `stop`，不会接受任意命令、路径或脚本文本。
+
+卸载本地连接组件时运行：
+
+```powershell
+uninstall_native_host.bat
+```
+
+卸载不会删除扩展、项目或 `.env`，也不会停止当前后端。`v1.0-mvp` 不包含这项实验功能；
+当前实现仍是开发者本地集成，不是面向普通用户的一键安装产品。
 
 ### 1. 准备环境
 
@@ -125,7 +157,7 @@ node --check extension/content.js
 python -m json.tool extension/manifest.json
 ```
 
-当前合并回归结果为：pytest 29 项通过，Node 提取与 popup 测试通过，JavaScript 和 Manifest 静态检查通过。合并后的真实 DeepSeek 在线联调依赖个人 API Key，本次未运行。
+当前功能分支回归结果为：pytest 43 项通过，Node 提取与 popup 测试通过，Native Host、JavaScript 和 Manifest 静态检查通过。真实 Edge 扩展 ID 集成验收与 DeepSeek 在线联调本次未运行。
 
 ## 当前边界
 
