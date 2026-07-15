@@ -12,8 +12,8 @@
 | 02 | 自动读取后的 popup 上半部分 | 页面标题、URL、清理后的 JD、成功状态 | “popup 打开后自动读取，智能识别岗位详情” |
 | 03 | 选中文字优先 | 页面中已选中的 JD 和扩展读取结果 | “复杂页面可通过选中文字获得确定性输入” |
 | 04 | 候选人资料区 | 一段匿名、真实且包含能力强弱层次的资料 | “candidate_profile 可编辑并保存在 localStorage” |
-| 05 | 完整分析结果 | 匹配度、摘要、匹配/待补技能、学习建议、理由、打招呼文案 | “DeepSeek 返回结构化结果，后端经过 Pydantic 校验” |
-| 06 | 测试结果 | `17 passed` 与 Node `smart job detail extraction: valid` | “核心接口、契约和提取场景有自动化验证” |
+| 05 | 完整分析结果 | score 卡片、matched/partial/missing/unverified 标签、评分依据折叠区、可编辑 greeting 与复制按钮 | “DeepSeek 提取要求和证据，后端按固定权重计算分数与依据” |
+| 06 | 测试结果 | `29 passed`、Node `smart job detail extraction: valid` 与 `popup UI behavior: valid` | “核心接口、评分、提取和 popup 交互有自动化验证” |
 
 可选第 07 张：FastAPI `/docs` 中的 `/api/analyze-job` 契约。若截图真实请求，必须确认请求体、响应体和浏览器开发工具中没有 API Key 或其他隐私信息。
 
@@ -48,5 +48,6 @@ docs/screenshots/
 - [ ] JD 确实来自画面中的公开岗位页。
 - [ ] `candidate_profile` 为匿名演示资料。
 - [ ] 分析结果是当次真实调用结果，没有手工修改 DOM。
+- [ ] `score_breakdown` 能展开，greeting 可编辑且复制反馈正常。
 - [ ] 页面中没有 API Key、个人身份信息或私人通知。
 - [ ] 图片没有声称全站点支持、客观评分、生产可用或经过大规模用户验证。

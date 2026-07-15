@@ -17,9 +17,11 @@ flowchart TB
 
     subgraph Local["本地 FastAPI"]
         API["main.py\n接口与请求校验"]
-        Service["llm.py\nDeepSeek 调用与异常处理"]
-        Validator["JobAnalysis\n严格 JSON 校验"]
-        API --> Service --> Validator --> API
+        Service["llm.py\nDeepSeek 证据提取与异常处理"]
+        Validator["ExtractedAnalysis\n结构化证据校验"]
+        Scorer["scoring.py\n固定权重确定性评分"]
+        Response["JobAnalysis\n最终响应校验"]
+        API --> Service --> Validator --> Scorer --> Response --> API
     end
 
     DeepSeek["DeepSeek API"]
@@ -34,10 +36,11 @@ flowchart TB
 | 组件 | 真实职责 | 不承担的职责 |
 | --- | --- | --- |
 | `extension/content.js` | 读取选中文字；寻找并评分岗位详情候选区域；清理部分噪声；执行语义区域回退 | 不持续监听页面，不调用模型，不绕过页面权限 |
-| `extension/popup.js` | 自动/手动触发读取；保存候选人资料；请求后端；渲染结构化结果 | 不保存 API Key，不在前端实现评分算法 |
+| `extension/popup.js` | 自动/手动触发读取；保护用户编辑；保存候选人资料；检查后端；防止重复分析；渲染新版结果并复制 greeting | 不保存 API Key，不在前端实现评分算法 |
 | `extension/manifest.json` | 声明 Manifest V3、`activeTab`、`scripting`、本地后端访问和 `Alt+J` | 不申请 `<all_urls>` |
 | `backend/app/main.py` | 提供根接口、健康检查和 `/api/analyze-job`；校验三项请求字段；转换服务异常 | 不抓取招聘网页 |
-| `backend/app/services/llm.py` | 读取后端配置；调用 DeepSeek；解析并严格校验 JSON；转换上游异常 | 不持久化用户数据，不提供客观招聘结论 |
+| `backend/app/services/llm.py` | 读取后端配置；调用 DeepSeek 提取要求和证据；解析并校验 JSON；组装最终响应；转换上游异常 | 不接受模型自由决定最终分数，不持久化用户数据 |
+| `backend/app/services/scoring.py` | 将技能和经历状态映射为固定分值，按适用维度权重计算 `score` 与 `score_breakdown` | 不调用模型、不读取环境变量，不把分数解释为录用概率 |
 
 ## 岗位内容提取顺序
 
@@ -76,10 +79,22 @@ flowchart TD
 
 ```json
 {
-  "score": 78,
-  "summary": "匹配摘要",
+  "score": 77,
+  "score_breakdown": {
+    "core_skills": {"score": 80, "weight": 0.5, "applicable": true, "reason": "固定规则说明"},
+    "preferred_skills": {"score": 60, "weight": 0.1666666667, "applicable": true, "reason": "固定规则说明"},
+    "project_experience": {"score": 70, "weight": 0.2222222222, "applicable": true, "reason": "固定规则说明"},
+    "education_background": {"score": 0, "weight": 0.0, "applicable": false, "reason": "岗位未提出教育要求"},
+    "work_experience": {"score": 100, "weight": 0.1111111111, "applicable": true, "reason": "固定规则说明"}
+  },
+  "summary": "按岗位明确要求和候选人证据确定性计算，综合匹配度为 77 分。",
   "matched_skills": ["Python"],
-  "missing_skills": ["Redis 未体现，需要确认"],
+  "partial_skills": ["Redis"],
+  "missing_skills": [],
+  "unverified_skills": ["Docker"],
+  "project_evidence": ["完成过 FastAPI 项目"],
+  "education_evidence": [],
+  "experience_evidence": [],
   "learning_plan": ["完成一个 Redis 缓存练习"],
   "reasoning": ["候选人资料明确提到 Python"],
   "greeting": "你好，我掌握 Python……",
@@ -87,7 +102,7 @@ flowchart TD
 }
 ```
 
-上例仅展示字段结构，不是固定输出或效果承诺。请求字段会去除首尾空白并限制长度；响应模型开启严格模式、禁止额外字段，并约束 `score` 为 0–100、`confidence` 为 0–1。
+上例仅展示字段结构，不是固定输出或效果承诺。DeepSeek 只提取要求、证据和离散状态，旧模型响应中的自由 `score` 会被忽略。后端按核心技能 45%、加分技能 15%、项目 20%、教育 10%、工作经验 10% 计算；不适用维度会被排除并重新归一化权重。技能状态固定映射为 matched 100、partial 60、unverified 25、missing 0。请求字段会去除首尾空白并限制长度，最终响应严格校验 `score`、`score_breakdown` 与其他字段。
 
 ## 安全与异常边界
 
@@ -95,4 +110,4 @@ flowchart TD
 - 环境变量优先于 `.env`，文件加载不会覆盖已有环境变量。
 - 缺少 Key 或配置不完整返回 503；认证、连接或上游状态异常转换为安全提示；超时返回 504；模型 JSON 无法通过校验返回 502。
 - 扩展只声明 `activeTab` 和 `scripting`，并仅为本地 `8000` 端口声明 host permission。
-- 当前没有数据库、登录、鉴权、数据加密、服务端持久化或云端部署配置，也未进行大规模用户验证，因此定位为本地 MVP，而非生产系统；模型评分仅供参考。
+- 当前没有数据库、登录、鉴权、数据加密、服务端持久化或云端部署配置，也未进行大规模用户验证，因此定位为本地 MVP，而非生产系统；确定性评分仍仅供求职辅助参考，不等于录用概率。
