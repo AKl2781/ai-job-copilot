@@ -10,9 +10,17 @@ flowchart TB
         Page["招聘详情页"]
         Extractor["content.js\n岗位内容提取"]
         Popup["popup.html / popup.js\n资料输入与结果展示"]
+        Worker["background.js\nNative Messaging 白名单转发"]
         Storage["localStorage\ncandidate_profile"]
         Page --> Extractor --> Popup
         Storage <--> Popup
+        Popup --> Worker
+    end
+
+    subgraph Native["Windows + Edge 本地控制"]
+        Host["短生命周期 Native Host\nstatus / start / stop"]
+        Scripts["固定 PowerShell 启停脚本\n进程归属检查"]
+        Worker --> Host --> Scripts
     end
 
     subgraph Local["本地 FastAPI"]
@@ -36,8 +44,10 @@ flowchart TB
 | 组件 | 真实职责 | 不承担的职责 |
 | --- | --- | --- |
 | `extension/content.js` | 读取选中文字；寻找并评分岗位详情候选区域；清理部分噪声；执行语义区域回退 | 不持续监听页面，不调用模型，不绕过页面权限 |
-| `extension/popup.js` | 自动/手动触发读取；保护用户编辑；保存候选人资料；检查后端；防止重复分析；渲染新版结果并复制 greeting | 不保存 API Key，不在前端实现评分算法 |
-| `extension/manifest.json` | 声明 Manifest V3、`activeTab`、`scripting`、本地后端访问和 `Alt+J` | 不申请 `<all_urls>` |
+| `extension/popup.js` | 自动/手动触发读取；保存候选人资料；按需保障后端健康；防止重复启动和分析；渲染结果并复制 greeting | 不保存 API Key，不在前端实现评分算法 |
+| `extension/background.js` | 仅把 `status/start/stop` 转发给固定 Native Host | 不接受任意命令、路径、URL 或脚本文本 |
+| `extension/manifest.json` | 声明 Manifest V3、`activeTab`、`scripting`、`nativeMessaging`、本地后端访问和 `Alt+J` | 不申请全站长期访问权限 |
+| `native_host/host.py` | 实现 Native Messaging 二进制协议；调用当前项目固定启停脚本 | 不读取 API Key，不修改 `.env`，不执行用户传入路径 |
 | `backend/app/main.py` | 提供根接口、健康检查和 `/api/analyze-job`；校验三项请求字段；转换服务异常 | 不抓取招聘网页 |
 | `backend/app/services/llm.py` | 读取后端配置；调用 DeepSeek 提取要求和证据；解析并校验 JSON；组装最终响应；转换上游异常 | 不接受模型自由决定最终分数，不持久化用户数据 |
 | `backend/app/services/scoring.py` | 将技能和经历状态映射为固定分值，按适用维度权重计算 `score` 与 `score_breakdown` | 不调用模型、不读取环境变量，不把分数解释为录用概率 |
@@ -109,5 +119,5 @@ flowchart TD
 - API Key 从项目根目录 `.env` 或操作系统环境变量读取，不发送到扩展端。
 - 环境变量优先于 `.env`，文件加载不会覆盖已有环境变量。
 - 缺少 Key 或配置不完整返回 503；认证、连接或上游状态异常转换为安全提示；超时返回 504；模型 JSON 无法通过校验返回 502。
-- 扩展只声明 `activeTab` 和 `scripting`，并仅为本地 `8000` 端口声明 host permission。
+- 扩展只声明 `activeTab`、`scripting` 和 `nativeMessaging`，并仅为本地 `8000` 端口声明 host permission。Native Host 当前仅支持 Windows、Microsoft Edge、本地解压缩扩展和当前用户 HKCU 注册。
 - 当前没有数据库、登录、鉴权、数据加密、服务端持久化或云端部署配置，也未进行大规模用户验证，因此定位为本地 MVP，而非生产系统；确定性评分仍仅供求职辅助参考，不等于录用概率。
