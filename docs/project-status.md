@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-AI Job Copilot 已完成本地 MVP 的核心闭环：Edge 优先、Chrome 兼容的 Manifest V3 扩展读取岗位内容和候选人资料，本地 FastAPI 调用 DeepSeek 提取岗位要求与候选人证据，再由后端按固定权重计算结构化匹配结果，API Key 只保留在后端。仓库提供 Windows 一键启动/停止入口，并包含 pytest 和 Node 测试。项目没有数据库或云端部署，未进行大规模用户验证；评分仅供参考，不等于录用概率。当前也没有自动投递或自动聊天，不具备生产系统所需的账号、鉴权、云端存储和运维能力。
+AI Job Copilot 已完成本地 MVP 的核心闭环：Edge 优先、Chrome 兼容的 Manifest V3 扩展读取岗位内容和候选人资料，本地 FastAPI 调用 DeepSeek 提取岗位要求与候选人证据，再由后端按固定权重计算结构化匹配结果，API Key 只保留在后端。仓库提供 Windows 一键启动/停止入口，并可通过当前用户的 Windows Task Scheduler 任务在登录后自动启动后端；浏览器扩展本身不执行本地脚本。项目包含 pytest 和 Node 测试，没有数据库或云端部署，未进行大规模用户验证；评分仅供参考，不等于录用概率。当前也没有自动投递或自动聊天，不具备生产系统所需的账号、鉴权、云端存储和运维能力。
 
 ## 功能状态矩阵
 
@@ -19,6 +19,7 @@ AI Job Copilot 已完成本地 MVP 的核心闭环：Edge 优先、Chrome 兼容
 | `candidate_profile` 输入 | 已实现 | popup 表单与三字段请求 |
 | 候选人资料 localStorage 保存 | 已实现 | `aiJobCopilot.candidateProfile` |
 | Windows 一键启动与停止 | 已实现 | `start_ai_job_copilot.bat`、`stop_ai_job_copilot.bat`、`scripts/*.ps1` |
+| Windows 登录后自动启动 | 已实现 | `install_autostart.bat`、`uninstall_autostart.bat`、当前用户 Task Scheduler 任务 |
 | FastAPI 根接口、健康检查和分析接口 | 已实现 | `backend/app/main.py` |
 | DeepSeek 要求与证据提取 | 已实现 | `backend/app/services/llm.py` |
 | 后端确定性评分 | 已实现 | `backend/app/services/scoring.py` 的固定状态映射与维度权重 |
@@ -48,6 +49,7 @@ AI Job Copilot 已完成本地 MVP 的核心闭环：Edge 优先、Chrome 兼容
 
 - 具体招聘网站在当前页面版本下的提取效果。
 - Edge 与 Chrome 实际加载、权限提示和快捷键冲突情况。
+- Windows 登录后的计划任务触发时机和后端日志窗口体验。
 - 真实网络环境中的 DeepSeek 延迟、限流和输出质量。
 - 候选人对匹配结果、建议和打招呼文案的人工核验。
 

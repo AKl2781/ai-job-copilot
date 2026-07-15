@@ -50,9 +50,11 @@ extension/
   popup.html/css/js       交互、资料保存、请求与结果渲染
   tests/content.test.js   Node 提取逻辑测试
   tests/popup.test.js     Node popup 交互测试
-scripts/                  Windows 后端启动与停止脚本
+scripts/                  Windows 后端启动、停止与自动启动管理脚本
 start_ai_job_copilot.bat  Windows 一键启动入口
 stop_ai_job_copilot.bat   Windows 一键停止入口
+install_autostart.bat     安装登录后自动启动
+uninstall_autostart.bat   取消登录后自动启动
 docs/                     架构、演示、面试与项目包装材料
 ```
 
@@ -78,7 +80,32 @@ Copy-Item .env.example .env
 
 ### 2. 启动后端
 
-Windows 推荐直接双击根目录的 `start_ai_job_copilot.bat`。启动后请保持后端窗口打开；使用完毕后双击 `stop_ai_job_copilot.bat` 停止后端。
+#### 推荐：登录后自动启动
+
+第一次在项目根目录运行：
+
+```text
+install_autostart.bat
+```
+
+脚本会为当前用户注册 Windows Task Scheduler 任务。以后登录 Windows 后，后端会延迟约 15 秒自动启动，无需再次手动运行启动脚本。
+
+取消自动启动：
+
+```text
+uninstall_autostart.bat
+```
+
+卸载只取消下次登录时的自动启动，不会停止已经运行的后端；如需停止，请运行 `stop_ai_job_copilot.bat`。
+
+#### 手动启动
+
+```text
+start_ai_job_copilot.bat
+stop_ai_job_copilot.bat
+```
+
+启动后请保持后端日志窗口打开。浏览器扩展本身不能直接执行本地 BAT 或 PowerShell；自动启动通过 Windows Task Scheduler 实现。
 
 也可以手动启动：
 
@@ -88,7 +115,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 打开 <http://127.0.0.1:8000/health>，返回 `{"status":"ok"}` 即表示服务可用。
 
-仓库也提供：
+本地使用不依赖 Docker。Docker 可作为未来部署选项，但不是当前本地使用的前置条件。仓库当前也提供：
 
 ```powershell
 docker compose up --build

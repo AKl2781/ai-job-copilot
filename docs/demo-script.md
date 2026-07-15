@@ -7,7 +7,7 @@
 ## 演示前准备
 
 - 在项目根目录准备未提交的 `.env`，确认 `LLM_API_KEY` 可用。
-- 双击 `start_ai_job_copilot.bat` 启动后端，并保持后端窗口打开。也可以手动运行：
+- 推荐首次运行 `install_autostart.bat`，由 Windows Task Scheduler 在以后登录时自动启动后端；演示环境未安装自动启动时，可双击 `start_ai_job_copilot.bat`，并保持后端窗口打开。浏览器扩展本身不能直接执行本地 BAT 或 PowerShell。也可以手动运行：
 
   ```powershell
   uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
@@ -32,7 +32,7 @@
 | 1:08–1:45 | 展示 score 卡片、技能标签与评分依据折叠区 | “DeepSeek 提取要求和证据，后端按固定权重计算总分；matched、partial、missing、unverified 会分开展示。” |
 | 1:45–2:00 | 编辑 greeting 并点击“复制打招呼文案” | “文案可以修改和复制，但项目不会自动发送消息；分数也只作求职辅助参考，不等于录用概率。” |
 
-演示结束后双击 `stop_ai_job_copilot.bat` 停止后端。
+演示结束后双击 `stop_ai_job_copilot.bat` 停止后端。若不再需要登录后自动启动，可运行 `uninstall_autostart.bat`；卸载自动启动不会结束当前后端。
 
 ## 4–5 分钟扩展讲解版
 
