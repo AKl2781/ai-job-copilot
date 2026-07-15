@@ -123,7 +123,11 @@ function Test-IsCurrentProjectBackend {
     $stateMatches = ($null -ne $state) -and
         ($state.ProjectRoot -eq $ProjectRoot) -and
         ([int]$state.ListenerProcessId -eq $ListenerProcessId)
-    return $stateMatches -or (Test-ParentReferencesProject $ProcessDetails)
+    $hostMatches = ($null -ne $state) -and
+        ($state.ProjectRoot -eq $ProjectRoot) -and
+        ([int]$state.HostProcessId -gt 0) -and
+        ([int]$ProcessDetails.ParentProcessId -eq [int]$state.HostProcessId)
+    return $stateMatches -or $hostMatches -or (Test-ParentReferencesProject $ProcessDetails)
 }
 
 function Get-HealthResult {
@@ -194,7 +198,16 @@ try {
             Write-Host "后端已经运行（PID $existingProcessId，进程 $processName）。" -ForegroundColor Yellow
             $health = Get-HealthResult
             Write-Host "健康检查：$($health.Message)" -ForegroundColor $(if ($health.Healthy) { 'Green' } else { 'Yellow' })
-            Save-BackendState -HostProcessId 0 -ListenerProcessId $existingProcessId
+            $state = Get-BackendState
+            $hostProcessId = if (($null -ne $state) -and
+                ($state.ProjectRoot -eq $ProjectRoot) -and
+                ([int]$state.HostProcessId -gt 0)) {
+                [int]$state.HostProcessId
+            }
+            else {
+                0
+            }
+            Save-BackendState -HostProcessId $hostProcessId -ListenerProcessId $existingProcessId
             exit 0
         }
 

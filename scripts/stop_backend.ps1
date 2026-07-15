@@ -125,14 +125,19 @@ try {
         ($state.ProjectRoot -eq $ProjectRoot) -and
         ([int]$state.ListenerProcessId -eq $listenerProcessId)
 
+    $hostMatches = ($null -ne $state) -and
+        ($state.ProjectRoot -eq $ProjectRoot) -and
+        ([int]$state.HostProcessId -gt 0) -and
+        ([int]$details.ParentProcessId -eq [int]$state.HostProcessId)
+
     $parentMatches = Test-ParentReferencesProject $details
 
-    if (-not $hasExpectedCommand -or (-not $stateMatches -and -not $parentMatches)) {
+    if (-not $hasExpectedCommand -or (-not $stateMatches -and -not $hostMatches -and -not $parentMatches)) {
         Write-Host "无法确认 PID $listenerProcessId（进程 $processName）属于当前 AI Job Copilot 后端。" -ForegroundColor Red
         if (-not $hasExpectedCommand) {
             Write-Host '命令行未同时包含 uvicorn 和 backend.app.main:app。'
         }
-        if (-not $stateMatches -and -not $parentMatches) {
+        if (-not $stateMatches -and -not $hostMatches -and -not $parentMatches) {
             Write-Host '当前项目的 PID 记录和父进程路径均无法证明进程归属。'
         }
         Write-Host '为避免误伤，脚本不会强制终止该进程。请人工确认并处理。'
@@ -161,7 +166,8 @@ try {
     if ($null -ne $state -and [int]$state.HostProcessId -gt 0) {
         $hostProcessId = [int]$state.HostProcessId
         $hostDetails = Get-ProcessDetails $hostProcessId
-        if ($null -ne $hostDetails -and $hostDetails.CommandLine -match [regex]::Escape($ProjectRoot)) {
+        if ($null -ne $hostDetails -and
+            ($hostMatches -or $hostDetails.CommandLine -match [regex]::Escape($ProjectRoot))) {
             Stop-Process -Id $hostProcessId -ErrorAction SilentlyContinue
         }
     }
