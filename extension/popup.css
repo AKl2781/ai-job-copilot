@@ -20,8 +20,15 @@ h1 {
 }
 
 .intro {
-  margin: 0 0 18px;
+  margin: 0 0 6px;
   color: #526078;
+}
+
+.hint {
+  margin: 0 0 18px;
+  color: #7a8497;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .job-section {

@@ -7,6 +7,7 @@ const jobDescription = document.querySelector("#job-description");
 const candidateProfile = document.querySelector("#candidate-profile");
 const analysisResult = document.querySelector("#analysis-result");
 const result = document.querySelector("#result");
+let jobDescriptionEdited = false;
 
 const CANDIDATE_PROFILE_STORAGE_KEY = "aiJobCopilot.candidateProfile";
 const DEFAULT_CANDIDATE_PROFILE =
@@ -33,6 +34,9 @@ function saveCandidateProfile() {
 
 loadCandidateProfile();
 candidateProfile.addEventListener("input", saveCandidateProfile);
+jobDescription.addEventListener("input", () => {
+  jobDescriptionEdited = true;
+});
 
 function setStatus(message, type = "") {
   result.className = "result";
@@ -65,7 +69,14 @@ function renderAnalysis(analysis) {
   analysisResult.hidden = false;
 }
 
-readJobButton.addEventListener("click", async () => {
+async function readCurrentJob({ automatic = false } = {}) {
+  if (!automatic && jobDescriptionEdited) {
+    const shouldReplace = window.confirm("重新读取会覆盖当前编辑的岗位 JD，是否继续？");
+    if (!shouldReplace) {
+      return;
+    }
+  }
+
   readJobButton.disabled = true;
   setStatus("正在读取当前网页…");
 
@@ -77,21 +88,7 @@ readJobButton.addEventListener("click", async () => {
 
     const injectionResults = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: () => {
-        const rawText = document.body?.innerText ?? "";
-        const cleanedText = rawText
-          .replace(/\r\n?/g, "\n")
-          .replace(/[ \t]+\n/g, "\n")
-          .replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, "\n\n")
-          .trim()
-          .slice(0, 8000);
-
-        return {
-          title: document.title.trim(),
-          url: window.location.href,
-          text: cleanedText,
-        };
-      },
+      func: extractJobContent,
     });
 
     const page = injectionResults[0]?.result;
@@ -99,21 +96,46 @@ readJobButton.addEventListener("click", async () => {
       throw new Error("The page did not return readable content");
     }
 
+    console.debug("Job content extraction", {
+      source: page.source,
+      candidateCount: page.debug?.candidateCount ?? 0,
+      score: page.debug?.score ?? null,
+      textLength: page.debug?.textLength ?? page.text.length,
+    });
+
     pageTitle.textContent = page.title || "未获取到页面标题";
     pageUrl.textContent = page.url || "未获取到页面 URL";
     pageUrl.title = page.url || "";
+
+    if (automatic && jobDescriptionEdited) {
+      setStatus("已保留手动编辑的岗位 JD", "success");
+      return;
+    }
+
     jobDescription.value = page.text;
-    setStatus(
-      page.text ? "当前岗位内容读取成功，可继续手动编辑" : "页面正文为空，可手动填写岗位 JD",
-      "success",
-    );
+    jobDescriptionEdited = false;
+
+    if (!page.text) {
+      setStatus("页面正文为空，可手动填写岗位 JD", "error");
+    } else if (page.source === "selection") {
+      setStatus("已读取当前选中的岗位内容", "success");
+    } else if (page.source === "smart-job-detail") {
+      setStatus("已智能识别岗位详情，请检查后再分析", "success");
+    } else if (["main", "article", "role-main"].includes(page.source)) {
+      setStatus("已自动读取页面主要内容", "success");
+    } else {
+      setStatus("未准确识别岗位详情，已读取整页内容，请手动删除无关内容", "error");
+    }
   } catch (error) {
     console.error("Reading the active page failed:", error);
     setStatus("无法读取当前网页，请确认页面允许扩展访问后重试", "error");
   } finally {
     readJobButton.disabled = false;
   }
-});
+}
+
+readJobButton.addEventListener("click", () => readCurrentJob());
+readCurrentJob({ automatic: true });
 
 analyzeJobButton.addEventListener("click", async () => {
   const description = jobDescription.value.trim();

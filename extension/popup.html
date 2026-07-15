@@ -10,11 +10,12 @@
     <main class="panel">
       <h1>AI Job Copilot</h1>
       <p class="intro">浏览器扩展初始化成功</p>
+      <p class="hint">可先在网页中选中岗位描述，再按 Alt+J 打开扩展。</p>
 
       <section class="job-section" aria-labelledby="job-heading">
         <div class="section-heading">
           <h2 id="job-heading">当前岗位</h2>
-          <button id="read-job" type="button">读取当前岗位</button>
+          <button id="read-job" type="button">重新读取岗位</button>
         </div>
 
         <dl class="page-details">
@@ -33,7 +34,7 @@
           id="job-description"
           rows="12"
           maxlength="8000"
-          placeholder="点击“读取当前岗位”获取网页正文，也可以在此手动输入或修改。"
+          placeholder="打开扩展后会自动读取，也可以在此手动输入或修改。"
         ></textarea>
       </section>
 
@@ -78,6 +79,7 @@
       <button id="health-check" class="secondary" type="button">检查后端连接</button>
       <p id="result" class="result" role="status" aria-live="polite"></p>
     </main>
+    <script src="content.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

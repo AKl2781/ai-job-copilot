@@ -1,10 +1,14 @@
-"""Static checks for the candidate profile flow in the browser extension."""
+"""Static checks for browser extension workflows."""
 
+import json
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 POPUP_HTML = (PROJECT_ROOT / "extension" / "popup.html").read_text(encoding="utf-8")
 POPUP_JS = (PROJECT_ROOT / "extension" / "popup.js").read_text(encoding="utf-8")
+MANIFEST = json.loads(
+    (PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8")
+)
 
 
 def test_candidate_profile_input_and_request_payload_exist() -> None:
@@ -39,3 +43,19 @@ def test_analysis_json_fields_are_rendered() -> None:
         "confidence",
     ):
         assert f"analysis.{field}" in POPUP_JS
+
+
+def test_popup_automatically_reads_and_keeps_reread_button() -> None:
+    assert "readCurrentJob({ automatic: true })" in POPUP_JS
+    assert "jobDescriptionEdited" in POPUP_JS
+    assert "window.confirm" in POPUP_JS
+    assert "重新读取岗位" in POPUP_HTML
+    assert "可先在网页中选中岗位描述，再按 Alt+J 打开扩展" in POPUP_HTML
+
+
+def test_manifest_has_action_shortcut_without_broad_access() -> None:
+    command = MANIFEST["commands"]["_execute_action"]
+
+    assert command["suggested_key"]["default"] == "Alt+J"
+    assert command["suggested_key"]["windows"] == "Alt+J"
+    assert "<all_urls>" not in MANIFEST.get("host_permissions", [])
