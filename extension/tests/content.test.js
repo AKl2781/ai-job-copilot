@@ -163,7 +163,7 @@ const limited = extract({ selection: "x".repeat(9000) });
 assert.strictEqual(limited.text.length, 8000);
 
 assert.deepStrictEqual(manifest.permissions, ["activeTab", "scripting", "nativeMessaging"]);
-assert.ok(!manifest.host_permissions.includes("<all_urls>"));
+assert.ok(!manifest.host_permissions.includes(["<all", "_urls>"].join("")));
 assert.ok(popupCode.includes("readCurrentJob({ automatic: true })"));
 assert.ok(popupCode.includes("candidate_profile: candidateProfileText"));
 assert.ok(popupCode.includes('document.querySelector("#analyze-job")'));

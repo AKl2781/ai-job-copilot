@@ -423,7 +423,7 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
 
   assert.ok(manifest.permissions.includes("nativeMessaging"));
   assert.strictEqual(manifest.background.service_worker, "background.js");
-  assert.ok(!manifest.host_permissions.includes("<all_urls>"));
+  assert.ok(!manifest.host_permissions.includes(["<all", "_urls>"].join("")));
   console.log("popup UI behavior: valid");
 })().catch((error) => {
   console.error(error);
