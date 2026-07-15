@@ -35,7 +35,8 @@ class FakeElement {
   }
 
   addEventListener(name, listener) {
-    this.listeners[name] = listener;
+    this.listeners[name] ||= [];
+    this.listeners[name].push(listener);
   }
 
   append(...children) {
@@ -56,11 +57,14 @@ class FakeElement {
   }
 
   async trigger(name) {
-    return this.listeners[name]?.({
-      target: this,
-      preventDefault() {},
-      stopPropagation() {},
-    });
+    for (const listener of this.listeners[name] || []) {
+      await listener({
+        target: this,
+        currentTarget: this,
+        preventDefault() {},
+        stopPropagation() {},
+      });
+    }
   }
 }
 
@@ -77,6 +81,7 @@ function createHarness() {
   const nativeCalls = [];
   const confirmCalls = [];
   const confirmQueue = [];
+  const debugCalls = [];
   let scriptRuns = 0;
   let copiedText = "";
 
@@ -147,7 +152,10 @@ function createHarness() {
       return fetchQueue.shift();
     },
     extractJobContent() {},
-    console: { debug() {}, error() {} },
+    console: {
+      debug: (...args) => debugCalls.push(args),
+      error() {},
+    },
     setTimeout: (callback, delay) => {
       timers.push({ callback, delay });
       return timers.length;
@@ -174,6 +182,7 @@ function createHarness() {
     nativeCalls,
     confirmCalls,
     confirmQueue,
+    debugCalls,
     getScriptRuns: () => scriptRuns,
     getCopiedText: () => copiedText,
   };
@@ -215,6 +224,7 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
     nativeCalls,
     confirmCalls,
     confirmQueue,
+    debugCalls,
   } = harness;
   await nextTurn();
   assert.strictEqual(harness.getScriptRuns(), 1, "popup should automatically read the active job");
@@ -306,6 +316,8 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
   assert.strictEqual(elements.result.textContent, "后端未连接，请先启动本地服务");
 
   vm.runInContext('setServiceState("stopped")', context);
+  assert.strictEqual(elements["service-control"].listeners.click.length, 1);
+  assert.strictEqual(elements["analyze-job"].listeners.click.length, 1);
   const confirmsBeforeDirectStart = confirmCalls.length;
   const startsBeforeDirectStart = nativeCalls.filter(({ action }) => action === "start").length;
   nativeQueue.push({ ok: true, state: "running", message: "正在启动" });
@@ -318,6 +330,10 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
     nativeCalls.filter(({ action }) => action === "start").length,
     startsBeforeDirectStart + 1,
     "direct start should be sent exactly once",
+  );
+  assert.ok(debugCalls.some(([message]) => message === "[service-control] manual start clicked"));
+  assert.ok(
+    !debugCalls.some(([message]) => message === "[service-control] analysis start confirmation"),
   );
 
   const confirmsBeforeStop = confirmCalls.length;

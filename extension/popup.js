@@ -20,6 +20,7 @@ const serviceControlLabel = document.querySelector("#service-control-label");
 const serviceSpinner = document.querySelector("#service-spinner");
 let jobDescriptionEdited = false;
 let analysisInProgress = false;
+let serviceControlInProgress = false;
 let copyFeedbackTimer;
 let localServiceState = "unknown";
 let nativeHostInstalled = null;
@@ -223,6 +224,7 @@ async function stopLocalService() {
 }
 
 async function confirmAndStartServiceForAnalysis() {
+  console.debug("[service-control] analysis start confirmation");
   const shouldStart = window.confirm(
     "本地服务尚未启动，是否现在启动并继续分析？",
   );
@@ -467,17 +469,25 @@ detectServiceStatus();
 serviceControlButton.addEventListener("click", async (event) => {
   event.preventDefault();
   event.stopPropagation();
+  if (serviceControlInProgress) return;
+  serviceControlInProgress = true;
   serviceControlButton.disabled = true;
-  if (localServiceState === "running") {
-    await stopLocalService();
-  } else {
-    showStatus("正在启动本地服务……", "loading");
-    if (await startLocalService()) showStatus("本地服务已启动", "success");
+  try {
+    if (localServiceState === "running") {
+      console.debug("[service-control] manual stop clicked");
+      await stopLocalService();
+    } else {
+      console.debug("[service-control] manual start clicked");
+      showStatus("正在启动本地服务……", "loading");
+      if (await startLocalService()) showStatus("本地服务已启动", "success");
+    }
+  } finally {
+    serviceControlInProgress = false;
   }
 });
 
 analyzeJobButton.addEventListener("click", async () => {
-  if (analysisInProgress) return;
+  if (analysisInProgress || serviceControlInProgress) return;
 
   const description = jobDescription.value.trim();
   const candidateProfileText = candidateProfile.value.trim();
