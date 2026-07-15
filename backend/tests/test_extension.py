@@ -220,7 +220,8 @@ def test_popup_contains_service_control_and_safe_analysis_resume() -> None:
     ):
         assert text in POPUP_HTML or text in POPUP_JS
     assert "本地服务尚未启动，是否现在启动并继续分析？" in POPUP_JS
-    assert "if (!(await startLocalService())) return" in POPUP_JS
+    assert "if (!(await confirmAndStartServiceForAnalysis())) return" in POPUP_JS
+    assert "return startLocalService();" in POPUP_JS
     assert "已取消启动，未发送分析请求" in POPUP_JS
 
 

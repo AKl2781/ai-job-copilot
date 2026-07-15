@@ -222,6 +222,18 @@ async function stopLocalService() {
   return false;
 }
 
+async function confirmAndStartServiceForAnalysis() {
+  const shouldStart = window.confirm(
+    "本地服务尚未启动，是否现在启动并继续分析？",
+  );
+  if (!shouldStart) {
+    showStatus("已取消启动，未发送分析请求", "info");
+    return false;
+  }
+  showStatus("正在启动本地服务，成功后将继续分析……", "loading");
+  return startLocalService();
+}
+
 function setLoadingState(isLoading) {
   analysisInProgress = isLoading;
   analyzeJobButton.disabled = isLoading;
@@ -452,7 +464,9 @@ readJobButton.addEventListener("click", () => readCurrentJob());
 readCurrentJob({ automatic: true });
 detectServiceStatus();
 
-serviceControlButton.addEventListener("click", async () => {
+serviceControlButton.addEventListener("click", async (event) => {
+  event.preventDefault();
+  event.stopPropagation();
   serviceControlButton.disabled = true;
   if (localServiceState === "running") {
     await stopLocalService();
@@ -487,15 +501,7 @@ analyzeJobButton.addEventListener("click", async () => {
         showStatus(NATIVE_INSTALL_MESSAGE, "error");
         return;
       }
-      const shouldStart = window.confirm(
-        "本地服务尚未启动，是否现在启动并继续分析？",
-      );
-      if (!shouldStart) {
-        showStatus("已取消启动，未发送分析请求", "info");
-        return;
-      }
-      showStatus("正在启动本地服务，成功后将继续分析……", "loading");
-      if (!(await startLocalService())) return;
+      if (!(await confirmAndStartServiceForAnalysis())) return;
     }
 
     showStatus("正在分析岗位……", "loading");
