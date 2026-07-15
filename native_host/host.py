@@ -94,20 +94,29 @@ def is_current_backend_healthy() -> bool:
     return _backend_state_matches_project() and is_backend_healthy()
 
 
-def _run_fixed_script(script: Path, timeout: float) -> bool:
+def _run_fixed_script(
+    script: Path,
+    timeout: float,
+    *,
+    hidden_backend_window: bool = False,
+) -> bool:
     if not script.is_file() or script.parent.resolve() != (PROJECT_ROOT / "scripts").resolve():
         return False
+    arguments = [
+        "powershell.exe",
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(script),
+    ]
+    if hidden_backend_window:
+        arguments.append("-Hidden")
+    creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     try:
         completed = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoLogo",
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                str(script),
-            ],
+            arguments,
             cwd=str(PROJECT_ROOT),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
@@ -115,6 +124,7 @@ def _run_fixed_script(script: Path, timeout: float) -> bool:
             timeout=timeout,
             check=False,
             shell=False,
+            creationflags=creationflags,
         )
     except (OSError, subprocess.TimeoutExpired):
         return False
@@ -133,7 +143,7 @@ def status_action() -> dict[str, object]:
 def start_action() -> dict[str, object]:
     if is_current_backend_healthy():
         return {"ok": True, "state": "running", "message": "本地服务正在运行"}
-    if not _run_fixed_script(START_SCRIPT, 15.0):
+    if not _run_fixed_script(START_SCRIPT, 15.0, hidden_backend_window=True):
         return {"ok": False, "state": "error", "message": "本地服务启动失败，请检查后端日志"}
     if is_current_backend_healthy():
         return {"ok": True, "state": "running", "message": "本地服务已启动"}

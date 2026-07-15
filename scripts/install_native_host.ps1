@@ -19,13 +19,13 @@ function ConvertTo-JsonStringContent {
 }
 
 if ($ExtensionId -cnotmatch '^[a-p]{32}$') {
-    throw '扩展 ID 无效。请从 edge://extensions 复制 32 位扩展 ID（字符范围 a-p）。'
+    throw 'Invalid extension ID. Copy the 32-character ID (a-p only) from edge://extensions.'
 }
 if (-not (Test-Path -LiteralPath $TemplatePath -PathType Leaf)) {
-    throw '找不到 Native Host manifest 模板。'
+    throw 'Native Host manifest template was not found.'
 }
 if (-not (Test-Path -LiteralPath $HostLauncher -PathType Leaf)) {
-    throw '找不到固定 Native Host 启动入口。'
+    throw 'The fixed Native Host launcher was not found.'
 }
 
 $resolvedManifestPath = [System.IO.Path]::GetFullPath($ManifestPath)
@@ -36,10 +36,10 @@ if (Test-Path -LiteralPath $RegistryPath) {
             $resolvedExistingPath = [System.IO.Path]::GetFullPath([string]$existingPath)
         }
         catch {
-            throw '同名 Native Host 注册项包含无效路径；为避免覆盖，安装已停止。'
+            throw 'The existing Native Host registration has an invalid path; refusing to overwrite it.'
         }
         if ($resolvedExistingPath -ne $resolvedManifestPath) {
-            throw '同名 Native Host 已指向其他项目；为避免覆盖，安装已停止。'
+            throw 'The Native Host name belongs to another project; refusing to overwrite it.'
         }
     }
 }
@@ -59,7 +59,7 @@ if ($parsedManifest.name -ne $HostName -or
     $parsedManifest.type -ne 'stdio' -or
     $parsedManifest.allowed_origins.Count -ne 1 -or
     $parsedManifest.allowed_origins[0] -ne "chrome-extension://$ExtensionId/") {
-    throw '生成的 Native Host manifest 验证失败。'
+    throw 'Generated Native Host manifest validation failed.'
 }
 
 [System.IO.File]::WriteAllText(
@@ -70,6 +70,6 @@ if ($parsedManifest.name -ne $HostName -or
 New-Item -Path $RegistryPath -Force | Out-Null
 Set-Item -LiteralPath $RegistryPath -Value $resolvedManifestPath
 
-Write-Host 'Native Messaging Host 已为当前用户安装。' -ForegroundColor Green
-Write-Host "允许的扩展来源：chrome-extension://$ExtensionId/"
-Write-Host '请在 edge://extensions 重新加载扩展后使用。'
+Write-Host 'Native Messaging Host installed for the current user.' -ForegroundColor Green
+Write-Host "Allowed extension origin: chrome-extension://$ExtensionId/"
+Write-Host 'Reload the extension at edge://extensions before use.'

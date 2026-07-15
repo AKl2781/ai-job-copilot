@@ -6,7 +6,7 @@ $RegistryPath = "HKCU:\Software\Microsoft\Edge\NativeMessagingHosts\$HostName"
 $resolvedManifestPath = [System.IO.Path]::GetFullPath($ManifestPath)
 
 if (-not (Test-Path -LiteralPath $RegistryPath)) {
-    Write-Host '当前项目的 Native Messaging Host 尚未安装。' -ForegroundColor Yellow
+    Write-Host 'The Native Messaging Host is not installed for this project.' -ForegroundColor Yellow
     exit 0
 }
 
@@ -15,11 +15,11 @@ try {
     $resolvedRegisteredPath = [System.IO.Path]::GetFullPath([string]$registeredPath)
 }
 catch {
-    throw '注册项路径无效；为避免删除其他 Host，卸载已停止。'
+    throw 'The registration path is invalid; refusing to remove another Host.'
 }
 
 if ($resolvedRegisteredPath -ne $resolvedManifestPath) {
-    throw '同名 Native Host 未指向当前项目；为避免误删，卸载已停止。'
+    throw 'The Native Host does not point to this project; refusing to remove it.'
 }
 
 Remove-Item -LiteralPath $RegistryPath -Force
@@ -27,5 +27,5 @@ if (Test-Path -LiteralPath $ManifestPath -PathType Leaf) {
     Remove-Item -LiteralPath $ManifestPath -Force
 }
 
-Write-Host '当前项目的 Native Messaging Host 已卸载。' -ForegroundColor Green
-Write-Host '扩展、项目、.env 和当前后端均未修改。'
+Write-Host 'The Native Messaging Host for this project was uninstalled.' -ForegroundColor Green
+Write-Host 'The extension, project, .env, and running backend were not changed.'

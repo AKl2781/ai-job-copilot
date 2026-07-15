@@ -19,6 +19,7 @@ HOST_PATH = PROJECT_ROOT / "native_host" / "host.py"
 HOST_SOURCE = HOST_PATH.read_text(encoding="utf-8")
 INSTALL_SOURCE = (PROJECT_ROOT / "scripts" / "install_native_host.ps1").read_text(encoding="utf-8")
 UNINSTALL_SOURCE = (PROJECT_ROOT / "scripts" / "uninstall_native_host.ps1").read_text(encoding="utf-8")
+START_BACKEND_SOURCE = (PROJECT_ROOT / "scripts" / "start_backend.ps1").read_text(encoding="utf-8-sig")
 
 HOST_SPEC = importlib.util.spec_from_file_location("ai_job_copilot_native_host", HOST_PATH)
 assert HOST_SPEC and HOST_SPEC.loader
@@ -164,6 +165,29 @@ def test_native_host_action_map_is_fixed_and_subprocess_is_not_shell() -> None:
     assert "shell=False" in HOST_SOURCE
     assert "START_SCRIPT" in HOST_SOURCE and "STOP_SCRIPT" in HOST_SOURCE
     assert "shell=True" not in HOST_SOURCE
+
+
+def test_native_host_uses_hidden_windows_only_for_native_start(monkeypatch) -> None:
+    captured = {}
+
+    def fake_run(arguments, **kwargs):
+        captured["arguments"] = arguments
+        captured["kwargs"] = kwargs
+        return type("Completed", (), {"returncode": 0})()
+
+    monkeypatch.setattr(HOST.subprocess, "run", fake_run)
+    assert HOST._run_fixed_script(
+        HOST.START_SCRIPT,
+        15.0,
+        hidden_backend_window=True,
+    )
+    assert captured["arguments"][-1] == "-Hidden"
+    assert captured["kwargs"]["shell"] is False
+    assert captured["kwargs"]["creationflags"] == HOST.subprocess.CREATE_NO_WINDOW
+    assert "[switch]$Hidden" in START_BACKEND_SOURCE
+    assert "if (-not $Hidden)" in START_BACKEND_SOURCE
+    assert "$backendArguments += '-NoExit'" in START_BACKEND_SOURCE
+    assert "if ($Hidden) { 'Hidden' } else { 'Normal' }" in START_BACKEND_SOURCE
 
 
 def test_native_host_does_not_access_secrets_or_modify_env_file() -> None:
