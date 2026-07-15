@@ -223,15 +223,9 @@ async function stopLocalService() {
   return false;
 }
 
-async function confirmAndStartServiceForAnalysis() {
-  console.debug("[service-control] analysis start confirmation");
-  const shouldStart = window.confirm(
-    "本地服务尚未启动，是否现在启动并继续分析？",
-  );
-  if (!shouldStart) {
-    showStatus("已取消启动，未发送分析请求", "info");
-    return false;
-  }
+async function ensureServiceForAnalysis() {
+  console.debug("[service-control] analysis auto-start requested");
+  analyzeLabel.textContent = "正在启动本地服务……";
   showStatus("正在启动本地服务，成功后将继续分析……", "loading");
   return startLocalService();
 }
@@ -374,11 +368,6 @@ function setReadSource(source, successful) {
 }
 
 async function readCurrentJob({ automatic = false } = {}) {
-  if (!automatic && jobDescriptionEdited) {
-    const shouldReplace = window.confirm("重新读取会覆盖当前编辑的岗位 JD，是否继续？");
-    if (!shouldReplace) return;
-  }
-
   readJobButton.disabled = true;
   showStatus("正在读取当前网页……", "loading");
 
@@ -489,8 +478,13 @@ serviceControlButton.addEventListener("click", async (event) => {
 analyzeJobButton.addEventListener("click", async () => {
   if (analysisInProgress || serviceControlInProgress) return;
 
+  const jobTitle = pageTitle.textContent.trim();
   const description = jobDescription.value.trim();
   const candidateProfileText = candidateProfile.value.trim();
+  if (!jobTitle || jobTitle === "尚未读取") {
+    showStatus("岗位标题为空，请先读取当前岗位", "warning");
+    return;
+  }
   if (!description) {
     showStatus("岗位内容为空，请先读取或填写 JD", "warning");
     return;
@@ -511,15 +505,16 @@ analyzeJobButton.addEventListener("click", async () => {
         showStatus(NATIVE_INSTALL_MESSAGE, "error");
         return;
       }
-      if (!(await confirmAndStartServiceForAnalysis())) return;
+      if (!(await ensureServiceForAnalysis())) return;
     }
 
+    analyzeLabel.textContent = "正在分析岗位……";
     showStatus("正在分析岗位……", "loading");
     const response = await fetch("http://127.0.0.1:8000/api/analyze-job", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        job_title: pageTitle.textContent.trim() || "未命名岗位",
+        job_title: jobTitle,
         job_description: description,
         candidate_profile: candidateProfileText,
       }),

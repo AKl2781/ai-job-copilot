@@ -83,7 +83,8 @@ def test_popup_has_loading_copy_and_scroll_interactions() -> None:
 def test_popup_automatically_reads_and_keeps_reread_button() -> None:
     assert "readCurrentJob({ automatic: true })" in POPUP_JS
     assert "jobDescriptionEdited" in POPUP_JS
-    assert "window.confirm" in POPUP_JS
+    assert "confirm(" not in POPUP_JS
+    assert "window.confirm" not in POPUP_JS
     assert "重新读取岗位" in POPUP_HTML
     assert "打开岗位详情页后按 Alt+J，可自动读取岗位内容" in POPUP_HTML
 
@@ -219,10 +220,10 @@ def test_popup_contains_service_control_and_safe_analysis_resume() -> None:
         "正在停止",
     ):
         assert text in POPUP_HTML or text in POPUP_JS
-    assert "本地服务尚未启动，是否现在启动并继续分析？" in POPUP_JS
-    assert "if (!(await confirmAndStartServiceForAnalysis())) return" in POPUP_JS
+    assert "ensureServiceForAnalysis" in POPUP_JS
+    assert "if (!(await ensureServiceForAnalysis())) return" in POPUP_JS
     assert "return startLocalService();" in POPUP_JS
-    assert "已取消启动，未发送分析请求" in POPUP_JS
+    assert "confirm(" not in POPUP_JS
 
 
 def test_installer_is_edge_hkcu_only_and_exact_origin() -> None:

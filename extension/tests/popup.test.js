@@ -5,6 +5,8 @@ const vm = require("vm");
 const popupHtml = fs.readFileSync("extension/popup.html", "utf8");
 const popupCode = fs.readFileSync("extension/popup.js", "utf8");
 const manifest = JSON.parse(fs.readFileSync("extension/manifest.json", "utf8"));
+const confirmCallToken = ["con", "firm("].join("");
+const windowConfirmToken = ["window", "confirm"].join(".");
 
 class FakeClassList {
   constructor(element) {
@@ -80,7 +82,6 @@ function createHarness() {
   const nativeQueue = [];
   const nativeCalls = [];
   const confirmCalls = [];
-  const confirmQueue = [];
   const debugCalls = [];
   let scriptRuns = 0;
   let copiedText = "";
@@ -104,7 +105,7 @@ function createHarness() {
     window: {
       confirm: (message) => {
         confirmCalls.push(message);
-        return confirmQueue.length ? confirmQueue.shift() : true;
+        return true;
       },
     },
     localStorage: {
@@ -181,7 +182,6 @@ function createHarness() {
     nativeQueue,
     nativeCalls,
     confirmCalls,
-    confirmQueue,
     debugCalls,
     getScriptRuns: () => scriptRuns,
     getCopiedText: () => copiedText,
@@ -223,7 +223,6 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
     nativeQueue,
     nativeCalls,
     confirmCalls,
-    confirmQueue,
     debugCalls,
   } = harness;
   await nextTurn();
@@ -304,11 +303,26 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
 
   elements["job-description"].value = "A complete job description";
   elements["candidate-profile"].value = "A truthful candidate profile";
+  const startsBeforeRunningAnalysis = nativeCalls.filter(({ action }) => action === "start").length;
+  const analysisBeforeRunningAnalysis = harness.fetchCalls.filter(
+    ([url, options]) => url.includes("/api/analyze-job") && options?.method === "POST",
+  ).length;
   fetchQueue.push({ ok: true, json: async () => ({ status: "ok" }) });
   fetchQueue.push({ ok: true, json: async () => fullResponse });
   await elements["analyze-job"].trigger("click");
   assert.strictEqual(elements["analysis-result"].scrollCalls.length, 1);
   assert.strictEqual(elements["analyze-job"].disabled, false);
+  assert.strictEqual(
+    nativeCalls.filter(({ action }) => action === "start").length,
+    startsBeforeRunningAnalysis,
+  );
+  assert.strictEqual(
+    harness.fetchCalls.filter(
+      ([url, options]) => url.includes("/api/analyze-job") && options?.method === "POST",
+    ).length,
+    analysisBeforeRunningAnalysis + 1,
+  );
+  assert.strictEqual(confirmCalls.length, 0);
 
   fetchQueue.push({ ok: true, json: async () => ({ status: "ok" }) });
   await elements["analyze-job"].trigger("click");
@@ -333,7 +347,7 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
   );
   assert.ok(debugCalls.some(([message]) => message === "[service-control] manual start clicked"));
   assert.ok(
-    !debugCalls.some(([message]) => message === "[service-control] analysis start confirmation"),
+    !debugCalls.some(([message]) => message === "[service-control] analysis auto-start requested"),
   );
 
   const confirmsBeforeStop = confirmCalls.length;
@@ -346,40 +360,66 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
   const analysisCallsBefore = harness.fetchCalls.filter(
     ([url, options]) => url.includes("/api/analyze-job") && options?.method === "POST",
   ).length;
-  const confirmsBeforeAnalysisStart = confirmCalls.length;
   const startsBeforeAnalysisStart = nativeCalls.filter(({ action }) => action === "start").length;
-  confirmQueue.push(true);
   nativeQueue.push({ ok: true, state: "running", message: "已启动" });
   fetchQueue.push({ ok: false, json: async () => ({}) });
   fetchQueue.push({ ok: true, json: async () => ({ status: "ok" }) });
   fetchQueue.push({ ok: true, json: async () => fullResponse });
-  await elements["analyze-job"].trigger("click");
+  const firstAnalyzeClick = elements["analyze-job"].trigger("click");
+  const duplicateAnalyzeClick = elements["analyze-job"].trigger("click");
+  await Promise.all([firstAnalyzeClick, duplicateAnalyzeClick]);
   const analysisCallsAfter = harness.fetchCalls.filter(
     ([url, options]) => url.includes("/api/analyze-job") && options?.method === "POST",
   ).length;
   assert.strictEqual(analysisCallsAfter, analysisCallsBefore + 1, "analysis should resume exactly once");
-  assert.strictEqual(confirmCalls.length, confirmsBeforeAnalysisStart + 1);
   assert.strictEqual(
     nativeCalls.filter(({ action }) => action === "start").length,
     startsBeforeAnalysisStart + 1,
-    "analysis continuation should start exactly once",
+    "rapid analysis clicks should auto-start exactly once",
   );
+  assert.strictEqual(confirmCalls.length, 0);
 
+  // A failed automatic start must not send an analysis request and must restore the button.
   vm.runInContext('setServiceState("stopped")', context);
-  confirmQueue.push(false);
   fetchQueue.push({ ok: false, json: async () => ({}) });
-  const callsBeforeCancel = harness.fetchCalls.length;
-  const startsBeforeCancel = nativeCalls.filter(({ action }) => action === "start").length;
-  const confirmsBeforeCancel = confirmCalls.length;
+  nativeQueue.push({ ok: false, state: "error", message: "安全启动失败" });
+  const analysisBeforeFailure = harness.fetchCalls.filter(
+    ([url, options]) => url.includes("/api/analyze-job") && options?.method === "POST",
+  ).length;
   await elements["analyze-job"].trigger("click");
-  assert.strictEqual(elements.result.textContent, "已取消启动，未发送分析请求");
-  assert.strictEqual(harness.fetchCalls.length, callsBeforeCancel + 1, "cancel only performs health check");
-  assert.strictEqual(confirmCalls.length, confirmsBeforeCancel + 1);
+  const analysisAfterFailure = harness.fetchCalls.filter(
+    ([url, options]) => url.includes("/api/analyze-job") && options?.method === "POST",
+  ).length;
+  assert.strictEqual(analysisAfterFailure, analysisBeforeFailure);
+  assert.strictEqual(elements.result.textContent, "安全启动失败");
+  assert.strictEqual(elements["analyze-job"].disabled, false);
+
+  // An unavailable Host must show installation guidance without start or analysis.
+  vm.runInContext('nativeHostInstalled = false; setServiceState("uninstalled")', context);
+  fetchQueue.push({ ok: false, json: async () => ({}) });
+  const startsBeforeUnavailable = nativeCalls.filter(({ action }) => action === "start").length;
+  const analysisBeforeUnavailable = harness.fetchCalls.filter(
+    ([url, options]) => url.includes("/api/analyze-job") && options?.method === "POST",
+  ).length;
+  await elements["analyze-job"].trigger("click");
   assert.strictEqual(
     nativeCalls.filter(({ action }) => action === "start").length,
-    startsBeforeCancel,
-    "cancel must not start the service",
+    startsBeforeUnavailable,
   );
+  assert.strictEqual(
+    harness.fetchCalls.filter(
+      ([url, options]) => url.includes("/api/analyze-job") && options?.method === "POST",
+    ).length,
+    analysisBeforeUnavailable,
+  );
+  assert.strictEqual(
+    elements.result.textContent,
+    "首次使用需要安装本地连接组件，请运行项目目录中的 install_native_host.bat。",
+  );
+  assert.strictEqual(confirmCalls.length, 0);
+
+  assert.ok(!popupCode.includes(confirmCallToken));
+  assert.ok(!popupCode.includes(windowConfirmToken));
 
   assert.ok(manifest.permissions.includes("nativeMessaging"));
   assert.strictEqual(manifest.background.service_worker, "background.js");
