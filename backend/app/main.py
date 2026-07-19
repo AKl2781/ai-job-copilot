@@ -4,7 +4,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
-from .services.llm import JobAnalysis, LLMServiceError, analyze_job
+from .application.analysis_service import analyze_job
+from .infrastructure.llm.parser import JobAnalysis
+from .infrastructure.llm.provider import LLMServiceError
 
 APP_NAME = "AI Job Copilot API"
 

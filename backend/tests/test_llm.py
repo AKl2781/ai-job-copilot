@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.app import main
+from backend.app.infrastructure.llm import deepseek
 from backend.app.services import llm
 
 client = TestClient(main.app)
@@ -106,7 +107,7 @@ def test_analyze_job_parses_mocked_model_json(monkeypatch, tmp_path) -> None:
 
 
 def test_missing_api_key_does_not_crash(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(llm, "ENV_FILE", tmp_path / ".env")
+    monkeypatch.setattr(deepseek, "ENV_FILE", tmp_path / ".env")
     monkeypatch.delenv("LLM_API_KEY", raising=False)
     response = client.post(
         "/api/analyze-job",
