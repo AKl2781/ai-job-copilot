@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #182121;
+  --muted: #66706d;
+  --paper: #f5f7f3;
+  --card: #ffffff;
+  --line: #e4e9e2;
+  --green: #234e43;
+  --green-soft: #e7f0eb;
+  --lime: #d9ef84;
+  --orange: #f1a56b;
+}
+
+* { box-sizing: border-box; }
+
+html { background: var(--paper); }
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 88% 4%, rgba(217, 239, 132, .18), transparent 24rem),
+    var(--paper);
+  font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+button, input, textarea { font: inherit; }
+
+::selection { color: #fff; background: var(--green); }
+
+.soft-shadow { box-shadow: 0 16px 45px rgba(31, 53, 45, .07); }
+.fine-grid { background-image: radial-gradient(#d9dfd8 0.7px, transparent 0.7px); background-size: 12px 12px; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-rise { animation: rise .45s ease-out both; }
