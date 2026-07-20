@@ -13,7 +13,9 @@ from ..infrastructure.database.repositories import (
 )
 from ..schemas import AnalysisCreate, JobCreate, ProfileCreate, ProfileUpdate
 
-DEFAULT_USER_EMAIL = "local@ai-job-copilot.local"
+# Development/demo fallback only. Authentication can replace the request-scoped
+# email at the API dependency boundary without changing these CRUD use cases.
+DEFAULT_USER_EMAIL = "demo@example.com"
 
 
 class ResourceNotFoundError(RuntimeError):
