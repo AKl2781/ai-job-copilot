@@ -53,6 +53,7 @@ export function AnalysisWorkflow({
   const modelReasons = stringList(result, "reasoning");
   const reasons = modelReasons.length > 0 ? modelReasons : scoreReasons(result);
   const gaps = stringList(result, "missing_skills");
+  const evidence = analysis?.evidence_json ?? [];
 
   async function startAnalysis() {
     setPhase("analyzing");
@@ -100,6 +101,13 @@ export function AnalysisWorkflow({
       <div className="grid gap-6 sm:grid-cols-2">
         <div><h3 className="text-[15px] font-bold">匹配理由</h3>{reasons.length > 0 ? <ul className="mt-4 space-y-3">{reasons.map((reason) => <li key={reason} className="text-sm leading-6 text-[#65706b]">• {reason}</li>)}</ul> : <p className="mt-4 text-sm text-[#8a938f]">暂无额外匹配理由。</p>}</div>
         <div><h3 className="text-[15px] font-bold">缺口</h3>{gaps.length > 0 ? <div className="mt-4 flex flex-wrap gap-2">{gaps.map((gap) => <span key={gap} className="rounded-lg bg-[#f7eadf] px-2.5 py-1.5 text-[11px] font-semibold text-[#8b5e3b]">{gap}</span>)}</div> : <p className="mt-4 text-sm text-[#8a938f]">未识别到明确缺口。</p>}</div>
+      </div>
+      <div className="mt-6 border-t border-[#edf0eb] pt-5">
+        <div className="flex items-center justify-between gap-3"><h3 className="text-[15px] font-bold">引用证据</h3><span className="text-[10px] font-bold text-[#929a96]">{evidence.length} 条</span></div>
+        {evidence.length > 0 ? <div className="mt-4 grid gap-3">{evidence.map((item) => <article key={`${item.requirement}-${item.chunk_id}`} className="rounded-xl bg-[#f6f8f4] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="text-xs font-bold text-[#315d4f]">{item.requirement}</h4><span className="text-[9px] font-black uppercase tracking-[.1em] text-[#8a938f]">{item.section} · chunk {item.chunk_id.slice(0, 8)}</span></div>
+          <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-[#626d68]">{item.content}</p>
+        </article>)}</div> : <p className="mt-4 text-sm text-[#8a938f]">暂无可引用的简历向量证据，分析已使用基础候选人资料安全完成。</p>}
       </div>
     </section>}
   </div>;

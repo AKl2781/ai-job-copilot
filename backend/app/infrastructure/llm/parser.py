@@ -143,8 +143,12 @@ def build_final_analysis(extracted: ExtractedAnalysis) -> JobAnalysis:
 
 
 def parse_analysis(content: str) -> JobAnalysis:
+    return build_final_analysis(parse_extracted_analysis(content))
+
+
+def parse_extracted_analysis(content: str) -> ExtractedAnalysis:
+    """Validate provider output without accepting or calculating a score."""
     try:
-        extracted = ExtractedAnalysis.model_validate(extract_json_object(content))
-        return build_final_analysis(extracted)
+        return ExtractedAnalysis.model_validate(extract_json_object(content))
     except (ValidationError, LLMResponseFormatError) as exc:
         raise LLMResponseFormatError("模型返回格式错误") from exc

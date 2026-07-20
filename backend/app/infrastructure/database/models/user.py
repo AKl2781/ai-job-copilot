@@ -13,6 +13,7 @@ from ..base import Base, TimestampMixin
 if TYPE_CHECKING:
     from .analysis import Analysis
     from .candidate_profile import CandidateProfile
+    from .document import Document
     from .job import Job
 
 
@@ -28,6 +29,10 @@ class User(TimestampMixin, Base):
     )
     jobs: Mapped[list["Job"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     analyses: Mapped[list["Analysis"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    documents: Mapped[list["Document"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )

@@ -24,12 +24,21 @@ export interface Analysis {
   status: string;
   score: number | null;
   result_json: Record<string, unknown>;
+  evidence_json: AnalysisEvidence[];
   scoring_version: string | null;
   prompt_version: string | null;
   model_provider: string | null;
   model_name: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AnalysisEvidence {
+  chunk_id: string;
+  document_id: string;
+  content: string;
+  section: string;
+  requirement: string;
 }
 
 export interface Profile {
@@ -41,6 +50,34 @@ export interface Profile {
   skills: string[];
   created_at: string;
   updated_at: string;
+}
+
+export interface ResumeDocument {
+  id: string;
+  filename: string;
+  file_type: "pdf" | "docx";
+  status: string;
+  chunk_count: number;
+  created_at: string;
+}
+
+export interface ResumeDocumentDetail extends ResumeDocument {
+  updated_at: string;
+}
+
+export interface DocumentChunk {
+  chunk_id: string;
+  section: string;
+  chunk_index: number;
+  content: string;
+}
+
+export interface RetrievalMatch {
+  chunk_id: string;
+  document_id: string;
+  content: string;
+  section: string;
+  score: number;
 }
 
 export class ApiError extends Error {
@@ -108,4 +145,19 @@ export const api = {
   ),
   getAnalyses: () => apiFetch<Analysis[]>("/api/v1/analyses"),
   getMyProfile: () => apiFetch<Profile>("/api/v1/profiles/me"),
+  getDocuments: () => apiFetch<ResumeDocument[]>("/api/v1/documents"),
+  getDocument: (id: string) => apiFetch<ResumeDocumentDetail>(
+    `/api/v1/documents/${encodeURIComponent(id)}`,
+  ),
+  getDocumentChunks: (id: string) => apiFetch<DocumentChunk[]>(
+    `/api/v1/documents/${encodeURIComponent(id)}/chunks`,
+  ),
+  searchDocuments: (query: string, topK = 5) => apiFetch<RetrievalMatch[]>(
+    "/api/v1/retrieval/search",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, top_k: topK }),
+    },
+  ),
 };

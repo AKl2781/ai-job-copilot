@@ -44,6 +44,9 @@ class Analysis(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(50), default="pending", nullable=False, index=True)
     score: Mapped[int | None] = mapped_column(Integer)
     result_json: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE, default=dict, nullable=False)
+    evidence_json: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON_TYPE, default=list, nullable=False
+    )
     scoring_version: Mapped[str | None] = mapped_column(String(100))
     prompt_version: Mapped[str | None] = mapped_column(String(100))
     model_provider: Mapped[str | None] = mapped_column(String(100))

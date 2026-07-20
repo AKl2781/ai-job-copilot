@@ -9,6 +9,16 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validat
 from ..infrastructure.llm.parser import JobAnalysis
 
 
+class AnalysisEvidence(BaseModel):
+    """A retrieved resume citation associated with a job requirement."""
+
+    chunk_id: uuid.UUID
+    document_id: uuid.UUID
+    content: str
+    section: str
+    requirement: str
+
+
 class AnalysisCreate(BaseModel):
     """Persist an analysis associated with an owned job and profile."""
 
@@ -17,6 +27,7 @@ class AnalysisCreate(BaseModel):
     status: str = Field(default="pending", min_length=1, max_length=50)
     score: int | None = Field(default=None, ge=0, le=100)
     result_json: dict[str, Any] = Field(default_factory=dict)
+    evidence_json: list[AnalysisEvidence] = Field(default_factory=list)
     scoring_version: str | None = Field(default=None, max_length=100)
     prompt_version: str | None = Field(default=None, max_length=100)
     model_provider: str | None = Field(default=None, max_length=100)

@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     )
 
     database_url: str = Field(min_length=1)
+    document_storage_path: Path = PROJECT_ROOT / "data" / "documents"
+    embedding_provider: str = "openai_compatible"
+    embedding_model: str = "BAAI/bge-m3"
+    embedding_dimension: int = Field(default=1024, gt=0)
+    embedding_base_url: str = ""
+    embedding_api_key: str = ""
 
 
 @lru_cache

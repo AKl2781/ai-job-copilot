@@ -11,14 +11,28 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from backend.app.core.config import PROJECT_ROOT, Settings, get_settings
 from backend.app.infrastructure.database.base import Base
-from backend.app.infrastructure.database.models import Analysis, CandidateProfile, Job, User
+from backend.app.infrastructure.database.models import (
+    Analysis,
+    CandidateProfile,
+    Document,
+    DocumentChunk,
+    Job,
+    User,
+)
 from backend.app.infrastructure.database import session as database_session
 from backend.app.infrastructure.database.session import (
     DatabaseConfigurationError,
     create_session_factory,
 )
 
-TABLE_NAMES = {"users", "candidate_profiles", "jobs", "analyses"}
+TABLE_NAMES = {
+    "users",
+    "candidate_profiles",
+    "jobs",
+    "analyses",
+    "documents",
+    "document_chunks",
+}
 
 
 def _alembic_config() -> Config:
@@ -66,12 +80,36 @@ def test_database_usage_without_url_raises_clear_error(monkeypatch) -> None:
 def test_models_define_required_tables_and_postgresql_jsonb() -> None:
     assert set(Base.metadata.tables) == TABLE_NAMES
     assert set(User.__table__.columns.keys()) == {"id", "email", "created_at", "updated_at"}
+    assert set(Document.__table__.columns.keys()) == {
+        "id",
+        "user_id",
+        "filename",
+        "file_type",
+        "storage_path",
+        "file_hash",
+        "status",
+        "created_at",
+        "updated_at",
+    }
+    assert set(DocumentChunk.__table__.columns.keys()) == {
+        "id",
+        "document_id",
+        "content",
+        "section",
+        "chunk_index",
+        "embedding",
+        "created_at",
+    }
     assert isinstance(
         CandidateProfile.__table__.c.skills.type.dialect_impl(postgresql.dialect()),
         JSONB,
     )
     assert isinstance(
         Analysis.__table__.c.result_json.type.dialect_impl(postgresql.dialect()),
+        JSONB,
+    )
+    assert isinstance(
+        Analysis.__table__.c.evidence_json.type.dialect_impl(postgresql.dialect()),
         JSONB,
     )
 
@@ -148,4 +186,6 @@ def test_initial_migration_renders_postgresql_jsonb_offline(monkeypatch, capsys)
     migration_sql = capsys.readouterr().out
     assert "CREATE TABLE users" in migration_sql
     assert "JSONB" in migration_sql
+    assert "CREATE EXTENSION IF NOT EXISTS vector" in migration_sql
+    assert "VECTOR(1024)" in migration_sql
     get_settings.cache_clear()

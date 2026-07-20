@@ -64,3 +64,43 @@ test("analyzeJob posts to the saved-job workflow", async () => {
   assert.equal(requestedUrl, `${API_BASE_URL}/api/v1/jobs/job%2F1/analyze`);
   assert.equal(requestedMethod, "POST");
 });
+
+test("document APIs use encoded user-scoped document paths", async () => {
+  const requestedUrls: string[] = [];
+  globalThis.fetch = async (input) => {
+    requestedUrls.push(String(input));
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  await api.getDocuments();
+  await api.getDocument("resume/a");
+  await api.getDocumentChunks("resume/a");
+
+  assert.deepEqual(requestedUrls, [
+    `${API_BASE_URL}/api/v1/documents`,
+    `${API_BASE_URL}/api/v1/documents/resume%2Fa`,
+    `${API_BASE_URL}/api/v1/documents/resume%2Fa/chunks`,
+  ]);
+});
+
+test("semantic search posts query and top_k", async () => {
+  let requestedUrl = "";
+  let requestedInit: RequestInit | undefined;
+  globalThis.fetch = async (input, init) => {
+    requestedUrl = String(input);
+    requestedInit = init;
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  await api.searchDocuments("FastAPI 后端经验", 3);
+
+  assert.equal(requestedUrl, `${API_BASE_URL}/api/v1/retrieval/search`);
+  assert.equal(requestedInit?.method, "POST");
+  assert.equal(requestedInit?.body, JSON.stringify({ query: "FastAPI 后端经验", top_k: 3 }));
+});
