@@ -1,0 +1,111 @@
+const DEFAULT_API_BASE_URL = "http://localhost:8000";
+
+export const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL
+).replace(/\/$/, "");
+
+export interface Job {
+  id: string;
+  user_id: string;
+  title: string;
+  company: string | null;
+  description: string;
+  source_url: string | null;
+  source_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Analysis {
+  id: string;
+  user_id: string;
+  job_id: string;
+  candidate_profile_id: string;
+  status: string;
+  score: number | null;
+  result_json: Record<string, unknown>;
+  scoring_version: string | null;
+  prompt_version: string | null;
+  model_provider: string | null;
+  model_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Profile {
+  id: string;
+  user_id: string;
+  name: string;
+  target_role: string | null;
+  summary: string | null;
+  skills: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export class ApiError extends Error {
+  public readonly status: number;
+  public readonly body?: unknown;
+
+  constructor(
+    message: string,
+    status: number,
+    body?: unknown,
+  ) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
+function errorMessage(body: unknown, status: number): string {
+  if (typeof body === "object" && body !== null && "detail" in body) {
+    const detail = (body as { detail?: unknown }).detail;
+    if (typeof detail === "string") return detail;
+  }
+  return `API request failed (${status})`;
+}
+
+export async function apiFetch<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const url = `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      ...init,
+      cache: init.cache ?? "no-store",
+      headers: {
+        Accept: "application/json",
+        ...init.headers,
+      },
+    });
+  } catch (error) {
+    throw new ApiError(
+      error instanceof Error ? `无法连接 API：${error.message}` : "无法连接 API",
+      0,
+    );
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => undefined);
+    throw new ApiError(errorMessage(body, response.status), response.status, body);
+  }
+
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
+}
+
+export const api = {
+  getJobs: () => apiFetch<Job[]>("/api/v1/jobs"),
+  getJob: (id: string) => apiFetch<Job>(`/api/v1/jobs/${encodeURIComponent(id)}`),
+  analyzeJob: (id: string) => apiFetch<Analysis>(
+    `/api/v1/jobs/${encodeURIComponent(id)}/analyze`,
+    { method: "POST" },
+  ),
+  getAnalyses: () => apiFetch<Analysis[]>("/api/v1/analyses"),
+  getMyProfile: () => apiFetch<Profile>("/api/v1/profiles/me"),
+};

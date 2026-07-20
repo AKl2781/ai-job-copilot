@@ -12,9 +12,11 @@ export function StatusPill({ status }: { status: string }) {
   return <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${tone}`}>{status === "运行中" && <span className="h-1.5 w-1.5 rounded-full bg-[#5b9a62]"/>}{status}</span>;
 }
 
-export function Score({ value }: { value: number }) { return <div className="flex items-center gap-2"><div className="h-1.5 w-12 overflow-hidden rounded-full bg-[#e7ebe5]"><div className="h-full rounded-full bg-[#6c9477]" style={{ width: `${value}%` }}/></div><strong className="text-sm">{value}</strong></div>; }
+export function Score({ value }: { value: number | null }) { return value === null
+  ? <span className="text-xs font-semibold text-[#9aa29f]">—</span>
+  : <div className="flex items-center gap-2"><div className="h-1.5 w-12 overflow-hidden rounded-full bg-[#e7ebe5]"><div className="h-full rounded-full bg-[#6c9477]" style={{ width: `${value}%` }}/></div><strong className="text-sm">{value}</strong></div>; }
 
-export function JobRow({ job }: { job: { id: string; company: string; role: string; status: string; score: number; location: string; date: string; accent: string } }) {
+export function JobRow({ job }: { job: { id: string; company: string; role: string; status: string; score: number | null; location: string; date: string; accent: string } }) {
   return <Link href={`/jobs/${job.id}`} className="grid grid-cols-[1fr_auto] items-center gap-4 border-t border-[#edf0eb] px-5 py-4 transition hover:bg-[#f9fbf8] md:grid-cols-[minmax(260px,1.3fr)_1fr_110px_100px_24px]">
     <div className="flex min-w-0 items-center gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#edf2eb] text-[11px] font-black text-[#466157]">{job.accent}</span><div className="min-w-0"><p className="truncate text-sm font-bold">{job.role}</p><p className="mt-1 truncate text-xs text-[#7d8682]">{job.company} · {job.location}</p></div></div>
     <div className="hidden md:block"><StatusPill status={job.status}/></div><div className="hidden md:block"><Score value={job.score}/></div><p className="hidden text-xs text-[#8a938f] md:block">{job.date}</p><Icon name="arrow" className="h-4 w-4 text-[#9aa29f]" />
