@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import hashlib
+import ntpath
 import os
+import re
 import struct
 import subprocess
 import sys
@@ -17,6 +19,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 START_SCRIPT = PROJECT_ROOT / "scripts" / "start_backend.ps1"
 STOP_SCRIPT = PROJECT_ROOT / "scripts" / "stop_backend.ps1"
 HEALTH_URL = "http://127.0.0.1:8000/health"
+BACKEND_PORT = 8000
 MAX_MESSAGE_BYTES = 64 * 1024
 VALID_STATES = {"stopped", "starting", "running", "stopping", "error"}
 
@@ -73,19 +76,138 @@ def is_backend_healthy() -> bool:
         return False
 
 
-def _backend_state_matches_project() -> bool:
+def _normalized_project_path(value: object) -> str:
+    """Normalize a Windows project path across case, slash, and relative forms."""
+    try:
+        resolved = str(Path(str(value)).resolve())
+    except (OSError, RuntimeError, ValueError):
+        return ""
+    return ntpath.normcase(ntpath.normpath(resolved)).rstrip("\\/")
+
+
+def _state_file_path() -> Path:
     normalized = str(PROJECT_ROOT.resolve()).rstrip("\\").lower().encode("utf-8")
     project_id = hashlib.sha256(normalized).hexdigest()[:16]
-    state_path = Path(tempfile.gettempdir()) / "AIJobCopilot" / f"backend-{project_id}.json"
+    return Path(tempfile.gettempdir()) / "AIJobCopilot" / f"backend-{project_id}.json"
+
+
+def _windows_process_pair(
+    listener_pid: int,
+    host_pid: int,
+) -> tuple[int, str, str, str] | None:
+    """Query the expected Uvicorn child and PowerShell parent in one operation."""
+    if os.name != "nt" or listener_pid <= 0 or host_pid <= 0:
+        return None
+    command = (
+        "$listener = Get-CimInstance Win32_Process "
+        f"-Filter 'ProcessId = {listener_pid}' -ErrorAction SilentlyContinue; "
+        "$hostProcess = Get-CimInstance Win32_Process "
+        f"-Filter 'ProcessId = {host_pid}' -ErrorAction SilentlyContinue; "
+        "if ($null -ne $listener -and $null -ne $hostProcess) { "
+        "[pscustomobject]@{ ListenerParentProcessId = [int]$listener.ParentProcessId; "
+        "ListenerName = [string]$listener.Name; "
+        "ListenerCommandLine = [string]$listener.CommandLine; "
+        "HostName = [string]$hostProcess.Name } "
+        "| ConvertTo-Json -Compress }"
+    )
+    try:
+        completed = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                command,
+            ],
+            cwd=str(PROJECT_ROOT),
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=3.0,
+            check=False,
+            shell=False,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        if completed.returncode != 0 or not completed.stdout.strip():
+            return None
+        value = json.loads(completed.stdout)
+        return (
+            int(value.get("ListenerParentProcessId") or 0),
+            str(value.get("ListenerName") or ""),
+            str(value.get("ListenerCommandLine") or ""),
+            str(value.get("HostName") or ""),
+        )
+    except (
+        OSError,
+        UnicodeError,
+        ValueError,
+        TypeError,
+        json.JSONDecodeError,
+        subprocess.TimeoutExpired,
+    ):
+        return None
+
+
+def _pid_owns_backend_port(pid: int) -> bool:
+    """Confirm that the recorded process is the listener on the fixed backend port."""
+    if os.name != "nt" or pid <= 0:
+        return False
+    try:
+        completed = subprocess.run(
+            ["netstat.exe", "-ano", "-p", "tcp"],
+            cwd=str(PROJECT_ROOT),
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=3.0,
+            check=False,
+            shell=False,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if completed.returncode != 0:
+        return False
+    pattern = re.compile(
+        rf"^\s*TCP\s+\S+:{BACKEND_PORT}\s+\S+\s+LISTENING\s+{pid}\s*$",
+        re.IGNORECASE,
+    )
+    return any(pattern.match(line) for line in completed.stdout.splitlines())
+
+
+def _process_matches_backend(listener_pid: int, host_pid: int) -> bool:
+    """Validate the expected PowerShell parent and Python/Uvicorn child."""
+    process_pair = _windows_process_pair(listener_pid, host_pid)
+    if process_pair is None:
+        return False
+    parent_pid, listener_name, command_line, host_name = process_pair
+    normalized_command = command_line.lower().replace("\\", "/")
+    return (
+        parent_pid == host_pid
+        and "python" in listener_name.lower()
+        and "powershell" in host_name.lower()
+        and "uvicorn" in normalized_command
+        and "backend.app.main:app" in normalized_command
+    )
+
+
+def _backend_state_matches_project() -> bool:
+    state_path = _state_file_path()
     try:
         state = json.loads(state_path.read_text(encoding="utf-8-sig"))
         listener_pid = int(state.get("ListenerProcessId") or 0)
-        if Path(str(state.get("ProjectRoot", ""))).resolve() != PROJECT_ROOT.resolve():
+        host_pid = int(state.get("HostProcessId") or 0)
+        if _normalized_project_path(state.get("ProjectRoot")) != _normalized_project_path(
+            PROJECT_ROOT
+        ):
             return False
-        if listener_pid <= 0:
+        if listener_pid <= 0 or host_pid <= 0:
             return False
-        os.kill(listener_pid, 0)
-        return True
+        return _pid_owns_backend_port(listener_pid) and _process_matches_backend(
+            listener_pid,
+            host_pid,
+        )
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         return False
 
