@@ -1,53 +1,41 @@
-# 截图指南
+# Phase 8.2 截图素材
 
-## 截图目标
+## 已采集页面
 
-建议准备 6 张截图，按“输入 → 读取 → 个性化 → 分析 → 工程验证 → 边界”讲清项目。截图应来自真实运行结果，不用设计稿冒充已实现界面。
+截图来自本地 Docker Compose Demo 的真实 HTTP 页面，统一使用 1440×1000 无私人浏览器资料的无头 Edge：
 
-## 截图清单
+| 文件 | 页面 | 证明点 |
+| --- | --- | --- |
+| `01-dashboard.png` | Dashboard | 全局指标、岗位漏斗、最近岗位 |
+| `02-jobs.png` | Jobs | PostgreSQL 中的真实 Demo 岗位列表 |
+| `03-job-detail.png` | Job Detail | 分析结果与 Agent Workflow 入口 |
+| `04-resumes.png` | Resume | 简历知识库与文档处理状态 |
 
-| 编号 | 画面 | 必须展示 | 建议说明 |
-| --- | --- | --- | --- |
-| 01 | 招聘详情页 + Edge 工具栏 | 可公开的岗位正文、已固定的扩展图标 | “从当前招聘页面开始，无需先复制整段 JD” |
-| 02 | 自动读取后的 popup 上半部分 | 页面标题、URL、清理后的 JD、成功状态 | “popup 打开后自动读取，智能识别岗位详情” |
-| 03 | 选中文字优先 | 页面中已选中的 JD 和扩展读取结果 | “复杂页面可通过选中文字获得确定性输入” |
-| 04 | 候选人资料区 | 一段匿名、真实且包含能力强弱层次的资料 | “candidate_profile 可编辑并保存在 localStorage” |
-| 05 | 完整分析结果 | score 卡片、matched/partial/missing/unverified 标签、评分依据折叠区、可编辑 greeting 与复制按钮 | “DeepSeek 提取要求和证据，后端按固定权重计算分数与依据” |
-| 06 | 测试结果 | `29 passed`、Node `smart job detail extraction: valid` 与 `popup UI behavior: valid` | “核心接口、评分、提取和 popup 交互有自动化验证” |
-
-可选第 07 张：FastAPI `/docs` 中的 `/api/analyze-job` 契约。若截图真实请求，必须确认请求体、响应体和浏览器开发工具中没有 API Key 或其他隐私信息。
-
-## 文件命名
+目录：
 
 ```text
 docs/screenshots/
-  01-job-page.png
-  02-auto-extraction.png
-  03-selection-priority.png
-  04-candidate-profile.png
-  05-analysis-result.png
-  06-tests-passed.png
+  01-dashboard.png
+  02-jobs.png
+  03-job-detail.png
+  04-resumes.png
 ```
 
-当前仓库没有这些实际截图；拍摄完成并检查隐私后再创建目录和加入文件，不要提交占位图冒充成果。
+## 采集规范
 
-## 拍摄规范
+- 必须从真实运行页面采集，不用设计稿冒充功能。
+- 截图前确认 `postgres`、`backend`、`frontend` 均 healthy。
+- 使用专门的临时浏览器 profile，避免私人书签、账号、头像和历史记录。
+- 不打开 `.env`、请求头、Docker inspect 环境变量或任何真实 API Key。
+- Demo 数据不得包含真实姓名、电话、邮箱或公司内部信息。
+- 页面更新后重新采集全部截图，避免不同版本 UI 混用。
+- README 使用的截图保持相同尺寸与主题，必要时只做无损裁剪，不修改页面内容。
 
-- 使用 Microsoft Edge，保留足够的浏览器上下文证明是扩展真实运行；避免把私人书签、账号头像和通知拍入画面。
-- 统一窗口尺寸和缩放比例，确保 380px 宽 popup 中的文字可读。
-- 分析结果较长时可截两张连续图，但不要拼接成看似同屏的虚假画面。
-- 候选人资料使用专门准备的匿名演示文本，不出现姓名、电话、邮箱、学校编号或公司内部信息。
-- 岗位页面优先选公开信息；必要时遮盖招聘者姓名、聊天记录和账号信息。
-- 测试截图应包含执行命令和最终结果，不必展示无关终端历史。
-- 不打开或截图 `.env`，不展示请求头、进程环境变量或 DeepSeek API Key。
+## 可选补充素材
 
-## 截图前检查
+- `05-agent-run.png`：已完成 Agent Run 的节点状态与结果。
+- `06-semantic-search.png`：Resume Detail 中的 pgvector 语义检索结果。
+- `07-compose-healthy.png`：终端中的三个 healthy 服务，不显示环境变量。
+- `08-architecture.png`：从 Mermaid 架构图导出的演示版图片。
 
-- [ ] 后端健康检查正常。
-- [ ] 当前扩展来自本仓库 `extension` 目录。
-- [ ] JD 确实来自画面中的公开岗位页。
-- [ ] `candidate_profile` 为匿名演示资料。
-- [ ] 分析结果是当次真实调用结果，没有手工修改 DOM。
-- [ ] `score_breakdown` 能展开，greeting 可编辑且复制反馈正常。
-- [ ] 页面中没有 API Key、个人身份信息或私人通知。
-- [ ] 图片没有声称全站点支持、客观评分、生产可用或经过大规模用户验证。
+补充素材必须来自真实运行结果；若外部 LLM / Embedding 未配置，应明确展示已有结果，不伪造一次新的成功调用。

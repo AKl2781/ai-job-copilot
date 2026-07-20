@@ -1,5 +1,10 @@
 # Docker Compose deployment
 
+For the local Windows Demo, double-click `start_demo.bat`. It builds and starts
+the stack, explicitly upgrades the Demo database to Alembic head, seeds only an
+empty Demo database, verifies both HTTP services, and opens the browser. Use
+`stop_demo.bat` to remove containers while preserving the named volume.
+
 ## Start
 
 Docker Compose reads `.env` for non-secret variable substitution when the file

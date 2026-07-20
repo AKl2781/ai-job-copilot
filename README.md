@@ -1,104 +1,143 @@
 # AI Job Copilot 2.0
 
-## 项目简介
+AI Job Copilot 是一个可本地运行的 AI 求职工作台：集中管理目标岗位与简历知识库，使用 RAG 检索候选人证据，通过受控 Agent Workflow 生成可解释的岗位匹配分析，并保留浏览器扩展采集 JD 的入口。
 
-AI Job Copilot 是一个基于浏览器扩展、FastAPI、Next.js 和 LLM 的 AI 求职助手。
+> 定位：本地 Demo / 工程作品，不自动投递、不代替用户判断，匹配分数不等于录用概率。
 
-当前版本面向本地 Demo，帮助用户捕获职位描述（JD）、管理岗位与候选人画像，并生成可解释的岗位匹配分析。项目只提供辅助分析，不代替用户判断，也不会自动投递职位。
+## Demo 预览
 
-## 当前能力
+| Dashboard | Jobs |
+| --- | --- |
+| ![Dashboard](docs/screenshots/01-dashboard.png) | ![Jobs](docs/screenshots/02-jobs.png) |
 
-- JD 捕获
-- 岗位管理
-- 候选人画像
-- AI 岗位匹配分析
-- 确定性评分
-- 分析结果持久化
-- Demo 数据
+| Job Detail | Resume Knowledge Base |
+| --- | --- |
+| ![Job Detail](docs/screenshots/03-job-detail.png) | ![Resume](docs/screenshots/04-resumes.png) |
 
-## 技术架构
+## 核心能力
 
-- Frontend：Next.js + TypeScript
-- Backend：FastAPI
-- Database：PostgreSQL
-- Migration：Alembic
-- AI：LLM Provider + Deterministic Scoring
+- 岗位管理、候选人画像与分析结果持久化
+- PDF / DOCX 简历解析、文本分块与 pgvector 向量检索
+- RAG 证据回溯：分析结果关联真实简历片段
+- 受控 Career Copilot Agent Workflow 与步骤状态持久化
+- LLM 证据提取 + 后端确定性评分
+- Manifest V3 浏览器扩展采集招聘页面 JD
+- Docker Compose 全栈部署与幂等 Demo Seed
 
-LLM Provider 负责提取岗位要求与候选人证据，后端使用固定规则进行确定性评分，并将分析结果持久化到 PostgreSQL。
+## 一键启动
 
-## 本地运行
+前置条件：Windows、Docker Desktop，以及可访问 Docker Hub 的网络环境。
 
-开始前请准备 Python 3.10+、Node.js 和 Docker，并在项目根目录根据 `.env.example` 创建本地 `.env`。不要提交 `.env` 或真实 API Key。
+双击：
 
-1. 启动数据库：
+```text
+start_demo.bat
+```
 
-   ```powershell
-   docker compose up -d
-   ```
+启动器会按顺序完成：
 
-2. 运行 migration：
+1. 检查 Docker daemon。
+2. 构建并启动 PostgreSQL、Backend、Frontend。
+3. 等待 PostgreSQL / Backend healthy。
+4. 显式执行 Alembic migration 到 head。
+5. 仅在 Demo 用户表为空时导入 Seed 数据。
+6. 验证 Backend 与 Frontend 后打开浏览器。
 
-   ```powershell
-   python -m alembic -c alembic.ini upgrade head
-   ```
+访问地址：
 
-3. 导入 Demo 数据：
+- Frontend：<http://localhost:3000>
+- Backend：<http://localhost:8000>
+- Health：<http://localhost:8000/health>
 
-   ```powershell
-   python backend/scripts/seed_demo.py
-   ```
+停止 Demo：
 
-   Demo Seed 仅允许在开发环境和本地数据库执行，可重复运行且不会重复创建 Demo 用户或岗位。它不会预先创建分析结果。
+```text
+stop_demo.bat
+```
 
-4. 启动 Backend：
+停止会删除容器与 Compose network，但保留 `aijobcopilot_postgres_data` 数据卷。不要使用 `docker compose down -v`，除非确实要删除本地 Demo 数据。
 
-   ```powershell
-   python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
-   ```
+## 命令行启动
 
-5. 启动 Frontend：
+不使用批处理入口时，可以显式执行：
 
-   ```powershell
-   cd frontend
-   npm run dev
-   ```
+```powershell
+docker compose up --build -d
+docker compose exec backend python -m alembic -c alembic.ini upgrade head
+docker compose exec backend python backend/scripts/seed_demo.py
+docker compose ps
+```
 
-默认访问地址为 `http://localhost:3000`，Backend 健康检查地址为 `http://127.0.0.1:8000/health`。
+Seed 是幂等的，但已有 Demo 数据时无需重复执行。Compose 本身不会自动运行 migration；一键 Demo 启动器是明确的本地初始化入口。完整说明见 [DOCKER.md](DOCKER.md)。
 
-## Demo 流程
+## 架构
 
-打开网页
+```mermaid
+flowchart LR
+    Browser["Browser / Extension"] --> Frontend["Next.js Frontend<br/>:3000"]
+    Browser --> Backend["FastAPI Backend<br/>:8000"]
+    Frontend --> Backend
+    Backend --> DB[("PostgreSQL 16<br/>pgvector")]
+    Backend --> RAG["RAG Retrieval"]
+    Backend --> Agent["Career Copilot Agent"]
+    RAG --> DB
+    Agent --> RAG
+    Agent --> Scoring["Deterministic Scoring"]
+    Agent --> LLM["LLM / Embedding Provider"]
+```
 
-→ 岗位管理
+详细的组件边界、数据流和 Docker 拓扑见 [docs/architecture.md](docs/architecture.md)。
 
-→ 查看岗位
+## 技术栈
 
-→ 打开岗位详情
+| 层 | 技术 |
+| --- | --- |
+| Frontend | Next.js 16、React 19、TypeScript、Tailwind CSS |
+| Backend | FastAPI、SQLAlchemy、Pydantic、Uvicorn |
+| Database | PostgreSQL 16、pgvector、Alembic |
+| AI | OpenAI-compatible LLM / Embedding、RAG、受控 Agent Workflow |
+| Browser | Manifest V3 Extension、Native Messaging（Windows / Edge） |
+| Deployment | Docker、Docker Compose、named volume、healthcheck |
 
-→ 查看 AI 分析结果
+## Demo 路线
+
+推荐 3 分钟演示顺序：
+
+1. Dashboard：展示岗位、分析、平均匹配度和流程概览。
+2. Jobs：打开一个真实 Demo 岗位。
+3. Job Detail：展示确定性评分、证据与 Agent 执行步骤。
+4. Resume：展示简历文档、分块和语义检索。
+5. Architecture：解释 Next.js → FastAPI → PostgreSQL/pgvector → RAG/Agent 数据流。
+
+逐步话术与故障兜底见 [docs/demo-script.md](docs/demo-script.md)，截图规范见 [docs/screenshot-guide.md](docs/screenshot-guide.md)。
+
+## 配置与安全
+
+- 不提交 `.env`、`.env.docker`、真实密码或 API Key。
+- Backend 容器可从本地、Git 忽略的 `.env.docker` 读取 LLM / Embedding 配置。
+- `DATABASE_URL` 由 Compose 注入并指向内部 `postgres` 服务。
+- 浏览器默认通过 `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000` 访问 API；Next.js SSR 通过 Compose 服务名访问 Backend。
+- Extension、Native Host、评分、RAG 和 Agent 逻辑与容器部署相互隔离。
 
 ## 验证
 
-在项目根目录运行 Backend 检查：
-
 ```powershell
-python -m compileall -q backend/app
-python -m pytest -q
+docker compose config
+docker compose build
+docker compose up -d
+docker compose ps
+curl.exe http://localhost:8000/health
+curl.exe -I http://localhost:3000
+docker compose exec backend python -m alembic -c alembic.ini current
+docker compose down
 ```
 
-在 `frontend` 目录运行 Frontend 检查：
+最近一次 Phase 8.1 本地验收结果：三个容器 healthy，Backend `/health` 返回 HTTP 200，Dashboard、Jobs、Resume、Job Detail 均返回 HTTP 200，Alembic `current == head == 20260720_0007`，停止后 named volume 保留。
 
-```powershell
-npm test
-npm run typecheck
-npm run build
-```
+## 项目边界
 
-## 当前限制
-
-- 尚未实现 RAG
-- 尚未实现 Agent Runtime
-- 尚未自动投递
-- 尚未接入正式用户系统
-
-当前 Demo 使用开发环境默认用户标识。未来接入登录系统时，应由认证层提供已验证的用户身份；CRUD 服务本身保持用户隔离，不承担认证职责。
+- 当前没有正式账号、鉴权、云同步或多人协作。
+- 外部 LLM / Embedding 调用依赖本地配置、网络与供应商可用性。
+- 浏览器扩展采用通用启发式提取，不承诺适配所有招聘网站。
+- 不提供自动投递、自动聊天或绕过招聘网站限制。
+- 当前部署目标是可复现的本地 Demo，不是公网生产环境。
