@@ -65,6 +65,25 @@ test("analyzeJob posts to the saved-job workflow", async () => {
   assert.equal(requestedMethod, "POST");
 });
 
+test("agent run APIs create and poll encoded runs", async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: String(input), init });
+    return new Response(JSON.stringify({ run_id: "run/1", status: "running" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  await api.createAgentRun("job-1");
+  await api.getAgentRun("run/1");
+
+  assert.equal(requests[0].url, `${API_BASE_URL}/api/v1/agent/runs`);
+  assert.equal(requests[0].init?.method, "POST");
+  assert.equal(requests[0].init?.body, JSON.stringify({ job_id: "job-1" }));
+  assert.equal(requests[1].url, `${API_BASE_URL}/api/v1/agent/runs/run%2F1`);
+});
+
 test("document APIs use encoded user-scoped document paths", async () => {
   const requestedUrls: string[] = [];
   globalThis.fetch = async (input) => {

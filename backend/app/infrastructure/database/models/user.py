@@ -11,6 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from .agent import AgentRun
     from .analysis import Analysis
     from .candidate_profile import CandidateProfile
     from .document import Document
@@ -33,6 +34,10 @@ class User(TimestampMixin, Base):
         cascade="all, delete-orphan",
     )
     documents: Mapped[list["Document"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    agent_runs: Mapped[list["AgentRun"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )

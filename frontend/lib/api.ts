@@ -41,6 +41,43 @@ export interface AnalysisEvidence {
   requirement: string;
 }
 
+export type AgentRunStatus = "pending" | "running" | "completed" | "failed" | "timeout";
+export type AgentStepStatus = "running" | "completed" | "failed";
+
+export interface AgentRunStarted {
+  run_id: string;
+  status: AgentRunStatus;
+}
+
+export interface AgentStep {
+  id: string;
+  step_name: string;
+  status: AgentStepStatus;
+  input_summary: string | null;
+  output_summary: string | null;
+  duration_ms: number | null;
+  created_at: string;
+}
+
+export interface AgentFinalResult {
+  analysis_id: string;
+  analysis: Record<string, unknown> & { score: number };
+  evidence: AnalysisEvidence[];
+}
+
+export interface AgentRun {
+  run_id: string;
+  user_id: string;
+  job_id: string;
+  status: AgentRunStatus;
+  current_step: string;
+  steps: AgentStep[];
+  result: AgentFinalResult | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Profile {
   id: string;
   user_id: string;
@@ -144,6 +181,17 @@ export const api = {
     { method: "POST" },
   ),
   getAnalyses: () => apiFetch<Analysis[]>("/api/v1/analyses"),
+  createAgentRun: (jobId: string) => apiFetch<AgentRunStarted>(
+    "/api/v1/agent/runs",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_id: jobId }),
+    },
+  ),
+  getAgentRun: (runId: string) => apiFetch<AgentRun>(
+    `/api/v1/agent/runs/${encodeURIComponent(runId)}`,
+  ),
   getMyProfile: () => apiFetch<Profile>("/api/v1/profiles/me"),
   getDocuments: () => apiFetch<ResumeDocument[]>("/api/v1/documents"),
   getDocument: (id: string) => apiFetch<ResumeDocumentDetail>(

@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     embedding_dimension: int = Field(default=1024, gt=0)
     embedding_base_url: str = ""
     embedding_api_key: str = ""
+    agent_run_timeout_seconds: float = Field(default=120.0, gt=0)
 
 
 @lru_cache

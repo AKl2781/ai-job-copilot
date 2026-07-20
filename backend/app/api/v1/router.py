@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from .analyses import router as analyses_router
+from .agent_runs import router as agent_runs_router
 from .documents import router as documents_router
 from .jobs import router as jobs_router
 from .profiles import router as profiles_router
@@ -14,3 +15,4 @@ router.include_router(jobs_router)
 router.include_router(analyses_router)
 router.include_router(documents_router)
 router.include_router(retrieval_router)
+router.include_router(agent_runs_router)

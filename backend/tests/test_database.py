@@ -12,6 +12,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from backend.app.core.config import PROJECT_ROOT, Settings, get_settings
 from backend.app.infrastructure.database.base import Base
 from backend.app.infrastructure.database.models import (
+    AgentRun,
+    AgentStep,
     Analysis,
     CandidateProfile,
     Document,
@@ -26,6 +28,8 @@ from backend.app.infrastructure.database.session import (
 )
 
 TABLE_NAMES = {
+    "agent_runs",
+    "agent_steps",
     "users",
     "candidate_profiles",
     "jobs",
@@ -110,6 +114,18 @@ def test_models_define_required_tables_and_postgresql_jsonb() -> None:
     )
     assert isinstance(
         Analysis.__table__.c.evidence_json.type.dialect_impl(postgresql.dialect()),
+        JSONB,
+    )
+    assert set(AgentRun.__table__.columns.keys()) == {
+        "id", "user_id", "job_id", "status", "current_step", "result_json",
+        "error_message", "created_at", "updated_at",
+    }
+    assert set(AgentStep.__table__.columns.keys()) == {
+        "id", "run_id", "step_name", "status", "input_summary",
+        "output_summary", "duration_ms", "created_at",
+    }
+    assert isinstance(
+        AgentRun.__table__.c.result_json.type.dialect_impl(postgresql.dialect()),
         JSONB,
     )
 

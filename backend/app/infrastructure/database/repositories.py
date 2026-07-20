@@ -6,7 +6,9 @@ import uuid
 from sqlalchemy import Float, func, select
 from sqlalchemy.orm import Session
 
-from .models import Analysis, CandidateProfile, Document, DocumentChunk, Job, User
+from .models import (
+    AgentRun, AgentStep, Analysis, CandidateProfile, Document, DocumentChunk, Job, User,
+)
 
 
 class UserRepository:
@@ -218,5 +220,44 @@ class AnalysisRepository:
                 select(Analysis)
                 .where(Analysis.user_id == user_id)
                 .order_by(Analysis.created_at.desc(), Analysis.id.desc())
+            )
+        )
+
+
+class AgentRunRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def add(self, run: AgentRun) -> AgentRun:
+        self.session.add(run)
+        self.session.flush()
+        return run
+
+    def get_for_user(self, run_id: uuid.UUID, user_id: uuid.UUID) -> AgentRun | None:
+        return self.session.scalar(
+            select(AgentRun).where(AgentRun.id == run_id, AgentRun.user_id == user_id)
+        )
+
+    def get_active_for_job(
+        self, user_id: uuid.UUID, job_id: uuid.UUID
+    ) -> AgentRun | None:
+        return self.session.scalar(
+            select(AgentRun).where(
+                AgentRun.user_id == user_id,
+                AgentRun.job_id == job_id,
+                AgentRun.status.in_(("pending", "running")),
+            )
+        )
+
+    def add_step(self, step: AgentStep) -> AgentStep:
+        self.session.add(step)
+        self.session.flush()
+        return step
+
+    def get_step(self, run_id: uuid.UUID, step_name: str) -> AgentStep | None:
+        return self.session.scalar(
+            select(AgentStep).where(
+                AgentStep.run_id == run_id,
+                AgentStep.step_name == step_name,
             )
         )

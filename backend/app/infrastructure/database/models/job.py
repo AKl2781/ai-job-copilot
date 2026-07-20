@@ -11,6 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from .agent import AgentRun
     from .analysis import Analysis
     from .user import User
 
@@ -32,6 +33,10 @@ class Job(TimestampMixin, Base):
 
     user: Mapped["User"] = relationship(back_populates="jobs")
     analyses: Mapped[list["Analysis"]] = relationship(
+        back_populates="job",
+        cascade="all, delete-orphan",
+    )
+    agent_runs: Mapped[list["AgentRun"]] = relationship(
         back_populates="job",
         cascade="all, delete-orphan",
     )

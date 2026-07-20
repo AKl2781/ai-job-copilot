@@ -5,6 +5,7 @@ import { Icon } from "@/components/icons";
 import { api, ApiError, type Analysis } from "@/lib/api";
 import { latestAnalysesByJob } from "@/lib/jobs";
 import { AnalysisWorkflow } from "./analysis-workflow";
+import { AgentWorkflow } from "./agent-workflow";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         <AnalysisWorkflow jobId={job.id} initialAnalysis={analysis}/>
         <section className="soft-shadow rounded-2xl border border-[#e4e9e2] bg-white p-6"><h2 className="text-[15px] font-bold">岗位描述</h2><p className="mt-4 whitespace-pre-line text-sm leading-7 text-[#68736e]">{job.description}</p></section>
       </div>
-      <aside><section className="rounded-2xl bg-[#d9ef84] p-5"><Icon name="spark" className="h-5 w-5 text-[#234e43]"/><div className="mt-4 flex items-center justify-between gap-3"><h2 className="text-[15px] font-bold text-[#234e43]">Agent 能力预览</h2><span className="rounded-full bg-white/60 px-2 py-1 text-[9px] font-black text-[#234e43]">未来能力</span></div><p className="mt-2 text-xs leading-5 text-[#436358]">未来可自动完成资料整理、简历建议和面试准备；当前版本不会创建或运行任务。</p><button disabled className="mt-4 w-full cursor-not-allowed rounded-xl bg-[#234e43]/60 py-2.5 text-xs font-bold text-white">暂未开放</button></section></aside>
+      <aside><AgentWorkflow jobId={job.id}/></aside>
     </div>
   </div></AppShell>;
 }

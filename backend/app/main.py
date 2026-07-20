@@ -1,19 +1,48 @@
 """FastAPI entry point for AI Job Copilot."""
 
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from .application.analysis_service import analyze_job
+from .application.agent_service import recover_stale_agent_runs
 from .application.crud_service import ResourceConflictError, ResourceNotFoundError
+from .api.dependencies import get_db_session
 from .api.v1 import router as v1_router
+from .core.config import get_settings
+from .infrastructure.database.session import (
+    DatabaseConfigurationError,
+    get_default_session_factory,
+)
 from .infrastructure.llm.parser import JobAnalysis
 from .infrastructure.llm.provider import LLMServiceError
+from sqlalchemy.exc import SQLAlchemyError
 
 APP_NAME = "AI Job Copilot API"
+logger = logging.getLogger(__name__)
 
-app = FastAPI(title=APP_NAME)
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    """Recover abandoned Agent Runs before accepting production traffic."""
+    # Database-backed API tests provide their own request session and test recovery directly.
+    if get_db_session not in application.dependency_overrides:
+        try:
+            with get_default_session_factory()() as session:
+                recover_stale_agent_runs(
+                    session,
+                    get_settings().agent_run_timeout_seconds,
+                )
+        except (DatabaseConfigurationError, SQLAlchemyError) as exc:
+            logger.warning("Agent Run startup recovery skipped: %s", exc)
+    yield
+
+
+app = FastAPI(title=APP_NAME, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

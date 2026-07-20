@@ -4,6 +4,8 @@ from fastapi import Depends, Header
 from sqlalchemy.orm import Session
 
 from ..application.analysis_service import ApplicationAnalysisService
+from ..application.analysis_service import AnalysisService
+from ..application.agent_service import AgentRunService
 from ..application.crud_service import DEFAULT_USER_EMAIL, CrudService
 from ..application.document_service import DocumentService
 from ..application.retrieval_service import RetrievalService
@@ -11,6 +13,7 @@ from ..core.config import get_settings
 from ..infrastructure.database.session import get_db_session
 from ..infrastructure.embedding import create_embedding_provider
 from ..infrastructure.embedding.provider import EmbeddingProvider
+from ..infrastructure.llm.deepseek import DeepSeekProvider
 
 
 def get_embedding_provider() -> EmbeddingProvider:
@@ -88,3 +91,25 @@ def get_retrieval_service(
 ) -> RetrievalService:
     """Build the current user's semantic retrieval workflow."""
     return RetrievalService(session, x_user_email, embedding_provider)
+
+
+def get_agent_run_service(
+    session: Session = Depends(get_db_session),
+    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
+    x_user_email: str = Header(
+        default=DEFAULT_USER_EMAIL,
+        alias="X-User-Email",
+        min_length=3,
+        max_length=320,
+        pattern=r"^[^\s@]+@[^\s@]+$",
+    ),
+) -> AgentRunService:
+    """Build the request-scoped constrained agent workflow."""
+    settings = get_settings()
+    return AgentRunService(
+        session,
+        x_user_email,
+        analyzer=AnalysisService(DeepSeekProvider()),
+        retrieval_service=RetrievalService(session, x_user_email, embedding_provider),
+        timeout_seconds=settings.agent_run_timeout_seconds,
+    )

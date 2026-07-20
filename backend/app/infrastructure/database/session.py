@@ -35,9 +35,14 @@ def _default_session_factory() -> sessionmaker[Session]:
     return create_session_factory(create_database_engine())
 
 
+def get_default_session_factory() -> sessionmaker[Session]:
+    """Return the process-wide session factory for startup maintenance tasks."""
+    return _default_session_factory()
+
+
 def get_db_session() -> Generator[Session, None, None]:
     """Yield one transactional session for future application dependencies."""
-    session = _default_session_factory()()
+    session = get_default_session_factory()()
     try:
         yield session
     finally:
