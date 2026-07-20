@@ -1,10 +1,13 @@
 """FastAPI entry point for AI Job Copilot."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from .application.analysis_service import analyze_job
+from .application.crud_service import ResourceConflictError, ResourceNotFoundError
+from .api.v1 import router as v1_router
 from .infrastructure.llm.parser import JobAnalysis
 from .infrastructure.llm.provider import LLMServiceError
 
@@ -14,12 +17,24 @@ app = FastAPI(title=APP_NAME)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost", "http://127.0.0.1"],
-    allow_origin_regex=r"chrome-extension://.*",
+    allow_origins=[],
+    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1)(:\d+)?|chrome-extension://.*)$",
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
+
+app.include_router(v1_router)
+
+
+@app.exception_handler(ResourceNotFoundError)
+def handle_not_found(_request: Request, exc: ResourceNotFoundError) -> JSONResponse:
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+
+@app.exception_handler(ResourceConflictError)
+def handle_conflict(_request: Request, exc: ResourceConflictError) -> JSONResponse:
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
 @app.get("/")
