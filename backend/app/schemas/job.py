@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
@@ -35,3 +36,11 @@ class JobRead(JobCreate):
     user_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+
+
+class JobCreateResponse(JobRead):
+    """Outcome of an idempotent saved-job create request."""
+
+    status: Literal["created", "duplicate"]
+    job_id: uuid.UUID
+    message: str | None = None

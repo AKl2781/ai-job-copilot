@@ -1,6 +1,8 @@
 const healthCheckButton = document.querySelector("#health-check");
 const readJobButton = document.querySelector("#read-job");
 const analyzeJobButton = document.querySelector("#analyze-job");
+const saveJobButton = document.querySelector("#save-job");
+const saveAndAnalyzeButton = document.querySelector("#save-and-analyze");
 const analyzeLabel = document.querySelector("#analyze-label");
 const analyzeSpinner = document.querySelector("#analyze-spinner");
 const backendStatus = document.querySelector("#backend-status");
@@ -20,6 +22,7 @@ const serviceControlLabel = document.querySelector("#service-control-label");
 const serviceSpinner = document.querySelector("#service-spinner");
 let jobDescriptionEdited = false;
 let analysisInProgress = false;
+let saveInProgress = false;
 let serviceControlInProgress = false;
 let copyFeedbackTimer;
 let localServiceState = "unknown";
@@ -237,6 +240,64 @@ function setLoadingState(isLoading) {
   analyzeLabel.textContent = isLoading ? "正在分析岗位……" : "分析岗位";
 }
 
+function currentJobPayload() {
+  const title = pageTitle.textContent.trim();
+  const description = jobDescription.value.trim();
+  if (!title || title === "尚未读取") throw new Error("岗位标题为空，请先读取当前岗位");
+  if (!description) throw new Error("岗位内容为空，请先读取或填写 JD");
+  return {
+    title,
+    company: null,
+    description,
+    source_url: pageUrl.textContent.trim() || null,
+    source_type: "extension",
+  };
+}
+
+async function saveCurrentJob({ analyze = false } = {}) {
+  if (saveInProgress || analysisInProgress) return;
+  saveInProgress = true;
+  saveJobButton.disabled = true;
+  saveAndAnalyzeButton.disabled = true;
+  try {
+    const payload = currentJobPayload();
+    if (!(await checkBackendHealth())) {
+      showStatus("后端未连接，无法保存岗位", "error");
+      return;
+    }
+    showStatus(analyze ? "正在保存岗位并分析……" : "正在保存岗位……", "loading");
+    const savedResponse = await fetch("http://127.0.0.1:8000/api/v1/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!savedResponse.ok) throw new Error(`保存岗位失败（HTTP ${savedResponse.status}）`);
+    const savedJob = await savedResponse.json();
+    if (savedJob.status === "duplicate") {
+      showStatus("该岗位已保存", "info");
+      return;
+    }
+    if (!analyze) {
+      showStatus("岗位保存成功", "success");
+      return;
+    }
+    const analysisResponse = await fetch(
+      `http://127.0.0.1:8000/api/v1/jobs/${encodeURIComponent(savedJob.job_id)}/analyze`,
+      { method: "POST" },
+    );
+    if (!analysisResponse.ok) throw new Error(`岗位已保存，但分析失败（HTTP ${analysisResponse.status}）`);
+    const savedAnalysis = await analysisResponse.json();
+    renderAnalysis(savedAnalysis.result_json || {});
+    showStatus("岗位已保存，分析结果已写入数据库", "success");
+  } catch (error) {
+    showStatus(error instanceof Error ? error.message : "保存岗位失败", "error");
+  } finally {
+    saveInProgress = false;
+    saveJobButton.disabled = false;
+    saveAndAnalyzeButton.disabled = false;
+  }
+}
+
 function renderSkillTags(elementId, sectionId, items) {
   const list = document.querySelector(`#${elementId}`);
   const section = document.querySelector(`#${sectionId}`);
@@ -451,6 +512,8 @@ greetingTextarea.addEventListener("input", () => {
   copyGreetingButton.disabled = !greetingTextarea.value.trim();
 });
 copyGreetingButton.addEventListener("click", copyGreeting);
+saveJobButton.addEventListener("click", () => saveCurrentJob());
+saveAndAnalyzeButton.addEventListener("click", () => saveCurrentJob({ analyze: true }));
 readJobButton.addEventListener("click", () => readCurrentJob());
 readCurrentJob({ automatic: true });
 detectServiceStatus();

@@ -48,6 +48,16 @@ class JobRepository:
         self.session.flush()
         return job
 
+    def get_by_fingerprint_for_user(
+        self, job_fingerprint: str, user_id: uuid.UUID
+    ) -> Job | None:
+        return self.session.scalar(
+            select(Job).where(
+                Job.job_fingerprint == job_fingerprint,
+                Job.user_id == user_id,
+            )
+        )
+
     def list_for_user(self, user_id: uuid.UUID) -> list[Job]:
         return list(
             self.session.scalars(

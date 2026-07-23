@@ -1,7 +1,11 @@
 """Transactional CRUD use cases for profiles, jobs, and analyses."""
 
 import uuid
+from dataclasses import dataclass
+from typing import Literal
 
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..infrastructure.database.models import Analysis, CandidateProfile, Job, User
@@ -12,6 +16,7 @@ from ..infrastructure.database.repositories import (
     UserRepository,
 )
 from ..schemas import AnalysisCreate, JobCreate, ProfileCreate, ProfileUpdate
+from .job_fingerprint import generate_job_fingerprint
 
 # Development/demo fallback only. Authentication can replace the request-scoped
 # email at the API dependency boundary without changing these CRUD use cases.
@@ -24,6 +29,15 @@ class ResourceNotFoundError(RuntimeError):
 
 class ResourceConflictError(RuntimeError):
     """Creating a resource would violate an application invariant."""
+
+
+@dataclass(frozen=True)
+class JobCreationResult:
+    """The persisted job and whether this request created it."""
+
+    job: Job
+    status: Literal["created", "duplicate"]
+    message: str | None = None
 
 
 class CrudService:
@@ -75,11 +89,43 @@ class CrudService:
         self._commit(profile)
         return profile
 
-    def create_job(self, payload: JobCreate) -> Job:
-        user = self._current_user()
-        job = self.jobs.add(Job(user_id=user.id, **payload.model_dump()))
-        self._commit(job)
-        return job
+    def create_job(self, payload: JobCreate) -> JobCreationResult:
+        fingerprint = generate_job_fingerprint(
+            source_url=payload.source_url,
+            title=payload.title,
+            company=payload.company,
+            description=payload.description,
+        )
+        try:
+            user = self._current_user()
+            existing = self.jobs.get_by_fingerprint_for_user(fingerprint, user.id)
+            if existing is not None:
+                self.session.commit()
+                return JobCreationResult(existing, "duplicate", "该岗位已保存")
+            job = self.jobs.add(
+                Job(
+                    user_id=user.id,
+                    job_fingerprint=fingerprint,
+                    **payload.model_dump(),
+                )
+            )
+            self._commit(job)
+            return JobCreationResult(job, "created")
+        except IntegrityError:
+            # The composite unique constraint is the final concurrency guard.
+            self.session.rollback()
+            persisted_user = self.session.scalar(
+                select(User).where(User.email == self.user_email)
+            )
+            if persisted_user is None:
+                raise
+            existing = self.jobs.get_by_fingerprint_for_user(
+                fingerprint, persisted_user.id
+            )
+            if existing is None:
+                raise
+            self.session.commit()
+            return JobCreationResult(existing, "duplicate", "该岗位已保存")
 
     def list_jobs(self) -> list[Job]:
         user = self._current_user()

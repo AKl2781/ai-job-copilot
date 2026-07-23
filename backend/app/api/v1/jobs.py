@@ -2,23 +2,38 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from ...application.analysis_service import ApplicationAnalysisService
 from ...application.crud_service import CrudService
 from ...infrastructure.llm.provider import LLMServiceError
-from ...schemas import JobAnalysisRead, JobCreate, JobRead
+from ...schemas import JobAnalysisRead, JobCreate, JobCreateResponse, JobRead
 from ..dependencies import get_application_analysis_service, get_crud_service
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
-@router.post("", response_model=JobRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=JobCreateResponse,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_job(
     payload: JobCreate,
+    response: Response,
     service: CrudService = Depends(get_crud_service),
 ) -> object:
-    return service.create_job(payload)
+    result = service.create_job(payload)
+    if result.status == "duplicate":
+        response.status_code = status.HTTP_200_OK
+    job_data = JobRead.model_validate(result.job).model_dump()
+    return {
+        **job_data,
+        "status": result.status,
+        "job_id": result.job.id,
+        "message": result.message,
+    }
 
 
 @router.get("", response_model=list[JobRead])

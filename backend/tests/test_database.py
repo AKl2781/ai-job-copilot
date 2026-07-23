@@ -1,11 +1,13 @@
 """Tests for database settings, models, sessions, and migrations."""
 
+import uuid
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, select
+import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -104,6 +106,18 @@ def test_models_define_required_tables_and_postgresql_jsonb() -> None:
         "embedding",
         "created_at",
     }
+    assert set(Job.__table__.columns.keys()) == {
+        "id",
+        "user_id",
+        "title",
+        "company",
+        "description",
+        "source_url",
+        "source_type",
+        "job_fingerprint",
+        "created_at",
+        "updated_at",
+    }
     assert isinstance(
         CandidateProfile.__table__.c.skills.type.dialect_impl(postgresql.dialect()),
         JSONB,
@@ -186,6 +200,82 @@ def test_initial_migration_upgrade_and_downgrade_on_sqlite(monkeypatch, tmp_path
 
     command.downgrade(config, "base")
     assert TABLE_NAMES.isdisjoint(set(inspect(engine).get_table_names()))
+    engine.dispose()
+    get_settings.cache_clear()
+
+
+def test_job_fingerprint_migration_preserves_legacy_duplicates(
+    monkeypatch, tmp_path
+) -> None:
+    database_url = _sqlite_url(tmp_path / "legacy-jobs.db")
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+    config = _alembic_config()
+    command.upgrade(config, "20260720_0007")
+
+    engine = create_engine(database_url)
+    user_id = uuid.uuid4()
+    first_job_id = uuid.uuid4()
+    users = sa.table(
+        "users",
+        sa.column("id", sa.Uuid()),
+        sa.column("email", sa.String()),
+    )
+    jobs = sa.table(
+        "jobs",
+        sa.column("id", sa.Uuid()),
+        sa.column("user_id", sa.Uuid()),
+        sa.column("title", sa.String()),
+        sa.column("company", sa.String()),
+        sa.column("description", sa.Text()),
+        sa.column("source_url", sa.String()),
+        sa.column("source_type", sa.String()),
+    )
+    with engine.begin() as connection:
+        connection.execute(
+            users.insert().values(id=user_id, email="legacy@example.test")
+        )
+        connection.execute(
+            jobs.insert(),
+            [
+                {
+                    "id": first_job_id,
+                    "user_id": user_id,
+                    "title": "Engineer",
+                    "company": "Example",
+                    "description": "Build APIs",
+                    "source_url": "https://example.test/jobs/1?securityId=old",
+                    "source_type": "manual",
+                },
+                {
+                    "id": uuid.uuid4(),
+                    "user_id": user_id,
+                    "title": "Engineer duplicate",
+                    "company": "Example",
+                    "description": "Changed copy",
+                    "source_url": "https://example.test/jobs/1?securityId=new",
+                    "source_type": "extension",
+                },
+            ],
+        )
+    engine.dispose()
+
+    command.upgrade(config, "head")
+    engine = create_engine(database_url)
+    migrated_jobs = sa.table(
+        "jobs",
+        sa.column("id", sa.Uuid()),
+        sa.column("job_fingerprint", sa.String()),
+    )
+    with engine.connect() as connection:
+        fingerprints = list(
+            connection.scalars(select(migrated_jobs.c.job_fingerprint))
+        )
+    assert len(fingerprints) == 2
+    assert sum(value is not None for value in fingerprints) == 1
+    assert "uq_jobs_user_id_job_fingerprint" in {
+        item["name"] for item in inspect(engine).get_unique_constraints("jobs")
+    }
     engine.dispose()
     get_settings.cache_clear()
 

@@ -195,6 +195,8 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
     "health-check",
     "read-job",
     "analyze-job",
+    "save-job",
+    "save-and-analyze",
     "page-title",
     "page-url",
     "read-source",
@@ -238,6 +240,33 @@ const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
   await elements["read-job"].trigger("click");
   await nextTurn();
   assert.strictEqual(harness.getScriptRuns(), 2, "reread button should read the active job again");
+
+  elements["page-title"].textContent = "Example job";
+  elements["page-url"].textContent = "https://example.com/jobs/7";
+  elements["job-description"].value = "Python developer job description";
+  fetchQueue.push({ ok: true, json: async () => ({ status: "ok" }) });
+  fetchQueue.push({
+    ok: true,
+    json: async () => ({ status: "duplicate", job_id: "existing-job" }),
+  });
+  const analysesBeforeDuplicateSave = harness.fetchCalls.filter(
+    ([url]) => url.includes("/analyze"),
+  ).length;
+  await elements["save-and-analyze"].trigger("click");
+  assert.strictEqual(elements.result.textContent, "该岗位已保存");
+  assert.strictEqual(
+    harness.fetchCalls.filter(([url]) => url.includes("/analyze")).length,
+    analysesBeforeDuplicateSave,
+    "duplicate saves must not continue to analysis",
+  );
+
+  fetchQueue.push({ ok: true, json: async () => ({ status: "ok" }) });
+  fetchQueue.push({
+    ok: true,
+    json: async () => ({ status: "created", job_id: "new-job" }),
+  });
+  await elements["save-job"].trigger("click");
+  assert.strictEqual(elements.result.textContent, "岗位保存成功");
 
   vm.runInContext("setLoadingState(true)", context);
   assert.strictEqual(elements["analyze-job"].disabled, true);

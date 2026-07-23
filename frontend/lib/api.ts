@@ -18,6 +18,12 @@ export interface Job {
   updated_at: string;
 }
 
+export interface JobCreateResponse extends Job {
+  status: "created" | "duplicate";
+  job_id: string;
+  message?: string | null;
+}
+
 export interface Analysis {
   id: string;
   user_id: string;
@@ -176,6 +182,14 @@ export async function apiFetch<T>(
 }
 
 export const api = {
+  createJob: (payload: Pick<Job, "title" | "company" | "description" | "source_url" | "source_type">) => apiFetch<JobCreateResponse>(
+    "/api/v1/jobs",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  ),
   getJobs: () => apiFetch<Job[]>("/api/v1/jobs"),
   getJob: (id: string) => apiFetch<Job>(`/api/v1/jobs/${encodeURIComponent(id)}`),
   analyzeJob: (id: string) => apiFetch<Analysis>(

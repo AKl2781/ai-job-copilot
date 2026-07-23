@@ -97,10 +97,13 @@
       </section>
 
       <section class="action-section" aria-label="分析操作">
+        <button id="save-job" class="button button-secondary" type="button">保存岗位</button>
+        <button id="save-and-analyze" class="button button-secondary" type="button">保存并分析</button>
         <button id="analyze-job" class="button button-primary" type="button">
           <span id="analyze-spinner" class="spinner" aria-hidden="true" hidden></span>
           <span id="analyze-label">分析岗位</span>
         </button>
+        <p class="field-help">“保存并分析”使用 Web 工作台中已保存的候选人资料，并将结果写入数据库。</p>
         <p id="result" class="status-message" role="status" aria-live="polite"></p>
       </section>
 

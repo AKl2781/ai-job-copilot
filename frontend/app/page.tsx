@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Icon } from "@/components/icons";
-import { JobRow, PageHeading, PrimaryButton } from "@/components/ui";
+import { JobRow, PageHeading } from "@/components/ui";
 import { api } from "@/lib/api";
 import { latestAnalysesByJob, toJobListItem } from "@/lib/jobs";
 
@@ -27,7 +27,7 @@ export default async function DashboardPage() {
   const maxFunnel = Math.max(...funnel.map(([, value]) => value), 1);
 
   return <AppShell><div className="animate-rise">
-    <PageHeading title="求职工作台" description={`已同步 ${jobs.length} 个岗位，${pending} 个岗位等待分析。`} action={<PrimaryButton>添加岗位</PrimaryButton>} />
+    <PageHeading title="求职工作台" description={`已同步 ${jobs.length} 个岗位，${pending} 个岗位等待分析。`} action={<Link href="/jobs" className="rounded-xl bg-[#234e43] px-4 py-2.5 text-sm font-bold text-white">＋ 添加岗位</Link>} />
 
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {[

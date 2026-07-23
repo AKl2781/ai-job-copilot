@@ -48,6 +48,46 @@ test("job detail IDs are URL encoded", async () => {
   assert.equal(requestedUrl, `${API_BASE_URL}/api/v1/jobs/a%2Fb`);
 });
 
+test("createJob persists a manual or extension payload", async () => {
+  let requestedInit: RequestInit | undefined;
+  globalThis.fetch = async (_input, init) => {
+    requestedInit = init;
+    return new Response(JSON.stringify({ id: "job-2" }), { status: 201 });
+  };
+  const payload = {
+    title: "Backend Engineer",
+    company: "Example",
+    description: "Build APIs",
+    source_url: null,
+    source_type: "manual",
+  };
+
+  await api.createJob(payload);
+
+  assert.equal(requestedInit?.method, "POST");
+  assert.equal(requestedInit?.body, JSON.stringify(payload));
+});
+
+test("createJob returns the idempotent creation status", async () => {
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    id: "job-2",
+    job_id: "job-2",
+    status: "duplicate",
+    message: "该岗位已保存",
+  }), { status: 200 });
+
+  const result = await api.createJob({
+    title: "Backend Engineer",
+    company: "Example",
+    description: "Build APIs",
+    source_url: "https://example.test/jobs/2",
+    source_type: "manual",
+  });
+
+  assert.equal(result.status, "duplicate");
+  assert.equal(result.job_id, "job-2");
+});
+
 test("analyzeJob posts to the saved-job workflow", async () => {
   let requestedUrl = "";
   let requestedMethod = "";

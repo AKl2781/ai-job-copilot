@@ -8,7 +8,7 @@ from .document import (
     DocumentListItem,
     DocumentRead,
 )
-from .job import JobCreate, JobRead
+from .job import JobCreate, JobCreateResponse, JobRead
 from .profile import ProfileCreate, ProfileRead, ProfileUpdate
 from .retrieval import RetrievalSearchRequest, RetrievalSearchResult
 
@@ -23,6 +23,7 @@ __all__ = [
     "DocumentRead",
     "JobAnalysisRead",
     "JobCreate",
+    "JobCreateResponse",
     "JobRead",
     "ProfileCreate",
     "ProfileRead",

@@ -1,7 +1,8 @@
 import { AppShell } from "@/components/app-shell";
-import { JobRow, PageHeading, PrimaryButton } from "@/components/ui";
+import { JobRow, PageHeading } from "@/components/ui";
 import { api } from "@/lib/api";
 import { latestAnalysesByJob, toJobListItem } from "@/lib/jobs";
+import { JobCreateForm } from "./job-create-form";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export default async function JobsPage() {
   const analyzed = rows.filter((job) => job.score !== null).length;
   const pending = rows.filter((job) => job.score === null).length;
 
-  return <AppShell><div className="animate-rise"><PageHeading eyebrow="Job pipeline" title="岗位管理" description="集中管理从浏览器扩展和手动添加的目标岗位。" action={<PrimaryButton>添加岗位</PrimaryButton>}/>
+  return <AppShell><div className="animate-rise"><PageHeading eyebrow="Job pipeline" title="岗位管理" description="集中管理从浏览器扩展和手动添加的目标岗位。" action={<JobCreateForm />}/>
     <div className="mb-4 flex flex-wrap items-center gap-2">{[`全部 ${rows.length}`, `已评分 ${analyzed}`, `待评分 ${pending}`].map((label, i) => <span key={label} className={`rounded-full px-3.5 py-2 text-xs font-bold ${i === 0 ? "bg-[#234e43] text-white" : "border border-[#dfe5dd] bg-white text-[#6e7874]"}`}>{label}</span>)}</div>
     <section className="soft-shadow overflow-hidden rounded-2xl border border-[#e4e9e2] bg-white">
       {rows.length > 0 && <div className="hidden grid-cols-[minmax(260px,1.3fr)_1fr_110px_100px_24px] px-5 py-4 text-[9px] font-black uppercase tracking-[.12em] text-[#9aa29f] md:grid"><span>岗位</span><span>状态</span><span>匹配度</span><span>更新时间</span><span/></div>}
