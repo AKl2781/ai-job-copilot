@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { Icon } from "@/components/icons";
 import { PageHeading } from "@/components/ui";
 import { api } from "@/lib/api";
+import { ResumeUpload } from "./resume-upload";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,8 @@ export default async function ResumesPage() {
       title="简历文档"
       description="查看已上传简历的解析状态、文本块数量和结构化内容。"
     />
+
+    <ResumeUpload />
 
     <section className="soft-shadow overflow-hidden rounded-2xl border border-[#e4e9e2] bg-white">
       {documents.length > 0 && <div className="hidden grid-cols-[minmax(240px,1.4fr)_100px_120px_120px_130px_24px] px-5 py-4 text-[9px] font-black uppercase tracking-[.12em] text-[#9aa29f] md:grid">

@@ -130,6 +130,9 @@ def test_upload_parses_and_persists_chunks(
     payload = response.json()
     assert payload["filename"] == filename
     assert payload["status"] == "ready"
+    assert payload["upload_status"] == "created"
+    assert payload["is_duplicate"] is False
+    assert payload["message"] == "简历上传并解析完成"
     assert {chunk["section"] for chunk in payload["chunks"]} == expected_sections
     assert [chunk["chunk_index"] for chunk in payload["chunks"]] == list(
         range(len(payload["chunks"]))
@@ -244,6 +247,9 @@ def test_duplicate_upload_returns_existing_document(document_api) -> None:
     assert first.status_code == 201
     assert duplicate.status_code == 200
     assert duplicate.json()["id"] == first.json()["id"]
+    assert duplicate.json()["upload_status"] == "duplicate"
+    assert duplicate.json()["is_duplicate"] is True
+    assert duplicate.json()["message"] == "该简历版本已存在，无需重新解析"
     with session_factory() as session:
         assert len(session.scalars(select(Document)).all()) == 1
 
@@ -281,9 +287,53 @@ def test_embedding_failure_marks_document_failed_without_saving_chunks(document_
         files={"file": ("resume.docx", _docx_bytes())},
     )
 
-    assert response.status_code == 422
+    assert response.status_code == 502
+    assert response.json()["detail"] == "test embedding failure"
     with session_factory() as session:
         document = session.scalar(select(Document))
         assert document is not None
         assert document.status == "failed"
+        assert session.scalars(select(DocumentChunk)).all() == []
+
+
+def test_failed_document_can_be_retried_after_embedding_recovers(document_api) -> None:
+    client, session_factory, _ = document_api
+    app.dependency_overrides[get_embedding_provider] = lambda: FailingEmbeddingProvider()
+    content = _docx_bytes()
+    failed = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("resume.docx", content)},
+    )
+    assert failed.status_code == 502
+
+    app.dependency_overrides[get_embedding_provider] = lambda: TestEmbeddingProvider()
+    retried = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("resume.docx", content)},
+    )
+
+    assert retried.status_code == 201
+    assert retried.json()["status"] == "ready"
+    with session_factory() as session:
+        documents = session.scalars(select(Document)).all()
+        assert len(documents) == 1
+        assert documents[0].status == "ready"
+
+
+def test_delete_document_removes_database_rows_and_stored_file(document_api) -> None:
+    client, session_factory, _ = document_api
+    uploaded = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("resume.docx", _docx_bytes())},
+    ).json()
+    stored_path = Path(uploaded["storage_path"])
+    assert stored_path.is_file()
+
+    response = client.delete(f"/api/v1/documents/{uploaded['id']}")
+
+    assert response.status_code == 204
+    assert not stored_path.exists()
+    assert client.get(f"/api/v1/documents/{uploaded['id']}").status_code == 404
+    with session_factory() as session:
+        assert session.scalars(select(Document)).all() == []
         assert session.scalars(select(DocumentChunk)).all() == []

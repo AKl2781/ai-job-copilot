@@ -15,7 +15,11 @@ from sqlalchemy.orm import Session
 from ..infrastructure.database.models import Document, DocumentChunk, User
 from ..infrastructure.database.repositories import DocumentRepository, UserRepository
 from ..infrastructure.database.vector import BGE_M3_DIMENSION
-from ..infrastructure.embedding.provider import EmbeddingProvider, EmbeddingResponseError
+from ..infrastructure.embedding.provider import (
+    EmbeddingProvider,
+    EmbeddingResponseError,
+    EmbeddingServiceError,
+)
 from .crud_service import ResourceNotFoundError
 from .document_processing import chunk_resume_text, extract_docx_text, extract_pdf_text
 
@@ -111,8 +115,17 @@ class DocumentService:
         file_hash = hashlib.sha256(data).hexdigest()
         existing = self.documents.get_by_hash_for_user(file_hash, user.id)
         if existing is not None:
+            if existing.status != "failed":
+                self.session.commit()
+                return DocumentUploadResult(document=existing, created=False)
+            failed_path = Path(existing.storage_path)
+            self.session.delete(existing)
             self.session.commit()
-            return DocumentUploadResult(document=existing, created=False)
+            try:
+                if failed_path.is_file() and failed_path.resolve().is_relative_to(self.storage_root):
+                    failed_path.unlink()
+            except OSError:
+                pass
 
         document_id = uuid.uuid4()
         destination = (
@@ -172,7 +185,7 @@ class DocumentService:
             if failed_document is not None:
                 failed_document.status = "failed"
                 self.session.commit()
-            if isinstance(exc, DocumentProcessingError):
+            if isinstance(exc, (DocumentProcessingError, EmbeddingServiceError)):
                 raise
             raise DocumentProcessingError("failed to process uploaded document") from exc
 
@@ -202,3 +215,25 @@ class DocumentService:
         chunks = self.documents.list_chunks_for_document(document_id)
         self.session.commit()
         return chunks
+
+    def delete(self, document_id: uuid.UUID) -> None:
+        user = self._current_user()
+        document = self.documents.get_for_user(document_id, user.id)
+        if document is None:
+            self.session.rollback()
+            raise ResourceNotFoundError("document not found")
+
+        stored_path = Path(document.storage_path)
+        self.session.delete(document)
+        self.session.commit()
+
+        try:
+            if stored_path.is_file() and stored_path.resolve().is_relative_to(self.storage_root):
+                stored_path.unlink()
+                parent = stored_path.parent
+                while parent != self.storage_root and parent.is_relative_to(self.storage_root):
+                    parent.rmdir()
+                    parent = parent.parent
+        except OSError:
+            # The database is authoritative; an orphaned local file can be cleaned up later.
+            pass

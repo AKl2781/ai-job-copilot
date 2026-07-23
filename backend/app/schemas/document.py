@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -53,3 +54,11 @@ class DocumentRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     chunks: list[DocumentChunkRead]
+
+
+class DocumentUploadRead(DocumentRead):
+    """Upload outcome while preserving the persisted document payload."""
+
+    upload_status: Literal["created", "duplicate"]
+    is_duplicate: bool
+    message: str

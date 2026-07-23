@@ -110,6 +110,12 @@ export interface ResumeDocumentDetail extends ResumeDocument {
   updated_at: string;
 }
 
+export interface ResumeDocumentUpload extends ResumeDocumentDetail {
+  upload_status: "created" | "duplicate";
+  is_duplicate: boolean;
+  message: string;
+}
+
 export interface DocumentChunk {
   chunk_id: string;
   section: string;
@@ -210,6 +216,18 @@ export const api = {
   ),
   getMyProfile: () => apiFetch<Profile>("/api/v1/profiles/me"),
   getDocuments: () => apiFetch<ResumeDocument[]>("/api/v1/documents"),
+  uploadDocument: (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return apiFetch<ResumeDocumentUpload>("/api/v1/documents/upload", {
+      method: "POST",
+      body,
+    });
+  },
+  deleteDocument: (id: string) => apiFetch<void>(
+    `/api/v1/documents/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  ),
   getDocument: (id: string) => apiFetch<ResumeDocumentDetail>(
     `/api/v1/documents/${encodeURIComponent(id)}`,
   ),

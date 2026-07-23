@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { API_BASE_URL, ApiError, api, apiFetch } from "./api.ts";
+import { documentUploadNotice } from "./document-upload.ts";
 
 const originalFetch = globalThis.fetch;
 
@@ -143,6 +144,44 @@ test("document APIs use encoded user-scoped document paths", async () => {
     `${API_BASE_URL}/api/v1/documents/resume%2Fa`,
     `${API_BASE_URL}/api/v1/documents/resume%2Fa/chunks`,
   ]);
+});
+
+test("document upload and delete use multipart and DELETE", async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: String(input), init });
+    if (init?.method === "DELETE") return new Response(null, { status: 204 });
+    return new Response(JSON.stringify({ id: "resume-1", status: "ready" }), { status: 201 });
+  };
+
+  await api.uploadDocument(new File(["resume"], "resume.pdf", { type: "application/pdf" }));
+  await api.deleteDocument("resume/a");
+
+  assert.equal(requests[0].url, `${API_BASE_URL}/api/v1/documents/upload`);
+  assert.equal(requests[0].init?.method, "POST");
+  assert.ok(requests[0].init?.body instanceof FormData);
+  assert.equal(requests[1].url, `${API_BASE_URL}/api/v1/documents/resume%2Fa`);
+  assert.equal(requests[1].init?.method, "DELETE");
+});
+
+test("duplicate document upload produces a duplicate notice", () => {
+  const notice = documentUploadNotice({
+    id: "resume-1",
+    filename: "resume.pdf",
+    file_type: "pdf",
+    status: "ready",
+    chunk_count: 2,
+    created_at: "2026-07-21T00:00:00Z",
+    updated_at: "2026-07-21T00:00:00Z",
+    upload_status: "duplicate",
+    is_duplicate: true,
+    message: "backend duplicate message",
+  });
+
+  assert.deepEqual(notice, {
+    message: "该简历版本已存在，无需重新解析",
+    tone: "duplicate",
+  });
 });
 
 test("semantic search posts query and top_k", async () => {

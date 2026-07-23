@@ -7,6 +7,7 @@ from .document import (
     DocumentDetailRead,
     DocumentListItem,
     DocumentRead,
+    DocumentUploadRead,
 )
 from .job import JobCreate, JobCreateResponse, JobRead
 from .profile import ProfileCreate, ProfileRead, ProfileUpdate
@@ -21,6 +22,7 @@ __all__ = [
     "DocumentDetailRead",
     "DocumentListItem",
     "DocumentRead",
+    "DocumentUploadRead",
     "JobAnalysisRead",
     "JobCreate",
     "JobCreateResponse",

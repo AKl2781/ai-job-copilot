@@ -11,7 +11,14 @@ from ...application.document_service import (
     MAX_DOCUMENT_SIZE,
     UnsupportedDocumentTypeError,
 )
-from ...schemas import DocumentChunkPublic, DocumentDetailRead, DocumentListItem, DocumentRead
+from ...infrastructure.embedding.provider import EmbeddingServiceError
+from ...schemas import (
+    DocumentChunkPublic,
+    DocumentDetailRead,
+    DocumentListItem,
+    DocumentRead,
+    DocumentUploadRead,
+)
 from ..dependencies import get_document_service
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -28,7 +35,7 @@ async def _read_limited(file: UploadFile) -> bytes:
 
 @router.post(
     "/upload",
-    response_model=DocumentRead,
+    response_model=DocumentUploadRead,
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_document(
@@ -42,13 +49,26 @@ async def upload_document(
         result = service.upload(file.filename or "", contents)
         if not result.created:
             response.status_code = status.HTTP_200_OK
-        return result.document
+        is_duplicate = not result.created
+        document_payload = DocumentRead.model_validate(result.document).model_dump()
+        return DocumentUploadRead.model_validate({
+            **document_payload,
+            "upload_status": "duplicate" if is_duplicate else "created",
+            "is_duplicate": is_duplicate,
+            "message": (
+                "该简历版本已存在，无需重新解析"
+                if is_duplicate
+                else "简历上传并解析完成"
+            ),
+        })
     except UnsupportedDocumentTypeError as exc:
         raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)) from exc
     except DocumentProcessingError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except DocumentTooLargeError as exc:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)) from exc
+    except EmbeddingServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.public_message) from exc
     finally:
         await file.close()
 
@@ -72,3 +92,12 @@ def list_document_chunks(
     service: DocumentService = Depends(get_document_service),
 ) -> object:
     return service.list_chunks(document_id)
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document(
+    document_id: uuid.UUID,
+    service: DocumentService = Depends(get_document_service),
+) -> Response:
+    service.delete(document_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

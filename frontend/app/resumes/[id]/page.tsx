@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { Icon } from "@/components/icons";
 import { api, ApiError, type DocumentChunk } from "@/lib/api";
 import { SemanticSearch } from "./semantic-search";
+import { DeleteDocument } from "./delete-document";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function ResumeDetailPage({ params }: { params: Promise<{ i
           <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#edf2eb] text-[#466157]"><Icon name="file" /></span>
           <div><h1 className="break-all text-2xl font-semibold tracking-[-.04em]">{document.filename}</h1><p className="mt-2 text-sm text-[#6f7975]">{document.file_type.toUpperCase()} · 上传于 {new Date(document.created_at).toLocaleString("zh-CN")}</p></div>
         </div>
-        <div className="flex gap-2 text-xs"><span className="rounded-full bg-[#e7f0e9] px-3 py-2 font-bold text-[#3d6c50]">{document.status === "ready" ? "解析完成" : document.status}</span><span className="rounded-full bg-[#f1f4ef] px-3 py-2 font-bold text-[#65716c]">{document.chunk_count} 个文本块</span></div>
+        <div><div className="flex gap-2 text-xs"><span className="rounded-full bg-[#e7f0e9] px-3 py-2 font-bold text-[#3d6c50]">{document.status === "ready" ? "解析完成" : document.status}</span><span className="rounded-full bg-[#f1f4ef] px-3 py-2 font-bold text-[#65716c]">{document.chunk_count} 个文本块</span></div><div className="mt-3"><DeleteDocument documentId={document.id} /></div></div>
       </div>
     </section>
 
