@@ -3,8 +3,19 @@ setlocal
 chcp 65001 >nul
 title AI Job Copilot 2.0 - Docker Demo
 
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start_demo.ps1"
+set "project_root=%~dp0"
+pushd "%project_root%" >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Unable to open project directory: %project_root%
+    echo.
+    pause
+    exit /b 1
+)
+
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%project_root%scripts\start_demo.ps1" -NoBuild
 set "exit_code=%ERRORLEVEL%"
+
+popd
 
 echo.
 pause

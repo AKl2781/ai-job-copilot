@@ -23,6 +23,8 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     env_file:
+      - path: .env
+        required: false
       - path: .env.docker
         required: false
     environment:

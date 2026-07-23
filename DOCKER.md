@@ -1,9 +1,25 @@
 # Docker Compose deployment
 
-For the local Windows Demo, double-click `start_demo.bat`. It builds and starts
-the stack, explicitly upgrades the Demo database to Alembic head, seeds only an
-empty Demo database, verifies both HTTP services, and opens the browser. Use
-`stop_demo.bat` to remove containers while preserving the named volume.
+## Windows desktop launcher
+
+Create the current user's desktop shortcut once:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/create_desktop_shortcut.ps1
+```
+
+After that, double-click **AI Job Copilot Demo** on the Windows desktop. The
+shortcut targets `start_demo.bat` and uses the repository root as its working
+directory, so it does not depend on the current Command Prompt directory.
+
+The launcher checks Docker Desktop, runs `docker compose up -d`, explicitly
+upgrades the local Demo database to Alembic head, seeds only an empty Demo
+database, waits for both HTTP services, and opens <http://localhost:3000>. If
+Docker Desktop is not running, it prints a clear instruction instead of trying
+to continue. Use `stop_demo.bat` to remove containers while preserving the
+named volume.
+
+## Developer start
 
 ## Start
 
@@ -21,7 +37,7 @@ the `postgres` service. It intentionally overrides any `DATABASE_URL` in
 `.env.docker`.
 
 ```powershell
-docker compose up --build -d
+docker compose up -d
 docker compose ps
 ```
 

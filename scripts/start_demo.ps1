@@ -30,6 +30,7 @@ function Wait-ForHealthyService {
         [int]$TimeoutSeconds = 90
     )
 
+    Write-Host "`n==> Wait for $ServiceName health check" -ForegroundColor Cyan
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     do {
         $containerId = docker compose ps -q $ServiceName 2>$null
@@ -46,7 +47,15 @@ function Wait-ForHealthyService {
 }
 
 try {
-    Invoke-DockerCommand "Check Docker daemon" { docker info --format "Docker Engine {{.ServerVersion}}" }
+    Write-Host "==> Check Docker Desktop" -ForegroundColor Cyan
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+        throw "Docker CLI was not found. Install and start Docker Desktop, then try again."
+    }
+
+    docker info --format "Docker Engine {{.ServerVersion}}" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Docker Desktop is not running. Start Docker Desktop, wait until it is ready, then double-click the shortcut again."
+    }
 
     if ($NoBuild) {
         Invoke-DockerCommand "Start Docker Compose services" { docker compose up -d }
@@ -110,6 +119,7 @@ try {
     Write-Host "Health:   http://localhost:8000/health"
 
     if (-not $NoBrowser) {
+        Write-Host "`n==> Open http://localhost:3000 in the default browser" -ForegroundColor Cyan
         Start-Process "http://localhost:3000"
     }
 }
