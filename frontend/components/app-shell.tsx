@@ -37,14 +37,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="mb-3 grid h-8 w-8 place-items-center rounded-lg bg-[#e4eedf] text-[#315d4f]"><Icon name="spark" className="h-4 w-4" /></span>
             <p className="text-xs font-bold">扩展已连接</p><p className="mt-1 text-[11px] leading-5 text-[#76807c]">从浏览器采集的岗位会自动进入待评估列表。</p>
           </div>
-          <button className="mt-4 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#69736f]"><Icon name="settings" className="h-[18px] w-[18px]" />设置</button>
+          <button disabled title="设置功能暂未开放" className="mt-4 flex w-full cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#9aa19e]"><Icon name="settings" className="h-[18px] w-[18px]" />设置（暂未开放）</button>
         </div>
       </aside>
 
       <div className="min-w-0">
         <header className="flex h-[76px] items-center justify-between border-b border-[#e3e8e1] bg-[#f7f9f5]/80 px-5 backdrop-blur md:px-8 lg:px-10">
-          <div className="relative hidden w-full max-w-[360px] sm:block"><Icon name="search" className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b9490]" /><input aria-label="搜索岗位" className="w-full rounded-xl border border-[#e0e6de] bg-white/80 py-2.5 pl-10 pr-4 text-sm outline-none placeholder:text-[#9ba39f] focus:border-[#91a99f]" placeholder="搜索岗位、公司或技能…" /></div>
-          <div className="ml-auto flex items-center gap-3"><button aria-label="通知" className="relative grid h-10 w-10 place-items-center rounded-xl border border-[#e0e6de] bg-white text-[#66706d]"><Icon name="bell" className="h-[18px] w-[18px]" /><span className="absolute right-2.5 top-2 h-1.5 w-1.5 rounded-full bg-[#e88955]" /></button><div className="h-7 w-px bg-[#dfe4de]"/><div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-full bg-[#d9ef84] text-xs font-black text-[#234e43]">LW</span><div className="hidden sm:block"><p className="text-xs font-bold">流水</p><p className="text-[10px] text-[#8a938f]">求职进行中</p></div></div></div>
+          <div className="relative hidden w-full max-w-[360px] sm:block"><Icon name="search" className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a5aca9]" /><input disabled aria-label="搜索岗位（暂未开放）" className="w-full cursor-not-allowed rounded-xl border border-[#e0e6de] bg-[#f1f3f0] py-2.5 pl-10 pr-4 text-sm placeholder:text-[#9ba39f]" placeholder="搜索功能暂未开放" /></div>
+          <div className="ml-auto flex items-center gap-3"><button disabled title="通知功能暂未开放" aria-label="通知（暂未开放）" className="grid h-10 w-10 cursor-not-allowed place-items-center rounded-xl border border-[#e0e6de] bg-[#f1f3f0] text-[#9aa19e]"><Icon name="bell" className="h-[18px] w-[18px]" /></button><div className="h-7 w-px bg-[#dfe4de]"/><div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-full bg-[#d9ef84] text-xs font-black text-[#234e43]">LW</span><div className="hidden sm:block"><p className="text-xs font-bold">流水</p><p className="text-[10px] text-[#8a938f]">求职进行中</p></div></div></div>
         </header>
         <main className="px-5 py-7 md:px-8 lg:px-10 lg:py-9">{children}</main>
       </div>
