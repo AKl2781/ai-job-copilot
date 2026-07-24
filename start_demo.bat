@@ -12,7 +12,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%project_root%scripts\start_demo.ps1" -NoBuild
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%project_root%scripts\start_demo.ps1"
 set "exit_code=%ERRORLEVEL%"
 
 popd

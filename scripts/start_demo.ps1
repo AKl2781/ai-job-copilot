@@ -7,6 +7,48 @@ param(
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot
+$dockerReady = $false
+
+function Test-DockerEngine {
+    param(
+        [ValidateSet("version", "info")]
+        [string]$Probe = "info"
+    )
+
+    # Native Docker errors are expected while Docker Desktop is starting.
+    # Suppress them here so the launcher can print a clear, actionable status.
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    try {
+        & docker $Probe *> $null
+        return ($LASTEXITCODE -eq 0)
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+}
+
+function Wait-ForDockerEngine {
+    param(
+        [int]$TimeoutSeconds = 120,
+        [int]$PollIntervalSeconds = 5
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-DockerEngine -Probe "info") {
+            return $true
+        }
+
+        Write-Host "Waiting for Docker Desktop Engine..." -ForegroundColor Yellow
+        Start-Sleep -Seconds $PollIntervalSeconds
+    }
+
+    return (Test-DockerEngine -Probe "info")
+}
 
 function Invoke-DockerCommand {
     param(
@@ -52,9 +94,43 @@ try {
         throw "Docker CLI was not found. Install and start Docker Desktop, then try again."
     }
 
-    docker info --format "Docker Engine {{.ServerVersion}}" 2>$null
+    if (-not (Test-DockerEngine -Probe "version")) {
+        $dockerDesktopProcess = Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue
+        if (-not $dockerDesktopProcess) {
+            $dockerDesktopCandidates = @(
+                "C:\Program Files\Docker\Docker\Docker Desktop.exe",
+                (Join-Path $env:LOCALAPPDATA "Programs\DockerDesktop\Docker Desktop.exe")
+            )
+            $dockerDesktopPath = $dockerDesktopCandidates |
+                Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+                Select-Object -First 1
+
+            if ($dockerDesktopPath) {
+                Write-Host "Docker Desktop is not running. Starting Docker Desktop..." -ForegroundColor Yellow
+                Start-Process -FilePath $dockerDesktopPath
+            }
+            else {
+                Write-Host "Docker Desktop executable was not found in a supported install location." -ForegroundColor Yellow
+            }
+        }
+        else {
+            Write-Host "Docker Desktop is running; waiting for the Engine to become ready..." -ForegroundColor Yellow
+        }
+
+        if (-not (Wait-ForDockerEngine -TimeoutSeconds 120 -PollIntervalSeconds 5)) {
+            throw @"
+Docker Desktop is not running or Engine failed to start.
+- Open Docker Desktop.
+- Wait until Engine Running is shown.
+- Run start_demo.bat again.
+"@
+        }
+    }
+
+    $dockerReady = $true
+    docker version
     if ($LASTEXITCODE -ne 0) {
-        throw "Docker Desktop is not running. Start Docker Desktop, wait until it is ready, then double-click the shortcut again."
+        throw "Docker Engine became unavailable during version verification."
     }
 
     if ($NoBuild) {
@@ -125,6 +201,8 @@ try {
 }
 catch {
     Write-Host "`nDemo startup failed: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Run 'docker compose ps' and 'docker compose logs' for details." -ForegroundColor Yellow
+    if ($dockerReady) {
+        Write-Host "Run 'docker compose ps' and 'docker compose logs' for details." -ForegroundColor Yellow
+    }
     exit 1
 }
